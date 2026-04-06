@@ -80,6 +80,7 @@ export default function LandingPage() {
       setSubmitResult(res.data.kode_laporan || res.data?.data?.kode_laporan);
     } catch (err) {
       alert('Gagal: ' + (err.response?.data?.message || err.message));
+      console.log(err.response?.data?.message || err.message)
     } finally {
       setLoadingSubmit(false);
     }

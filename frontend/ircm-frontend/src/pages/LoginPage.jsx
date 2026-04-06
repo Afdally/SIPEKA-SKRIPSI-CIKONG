@@ -78,7 +78,7 @@ export default function LoginPage() {
               </svg>
             </div>
             <div>
-              <div className="auth-logo-main">IRCM</div>
+              <div className="auth-logo-main">SIPEKA</div>
               <div className="auth-logo-sub">DPPPA Kota Kendari</div>
             </div>
           </Link>
