@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import DashboardDP3A from './pages/DashboardDP3A';
-import DashboardKelurahan from './pages/DashboardKelurahan';
+import DashboardSuperAdmin from './pages/DashboardSuperAdmin';
 
 // Auth Guard sederhana
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -16,8 +16,6 @@ const ProtectedRoute = ({ children, allowedRole }) => {
   try {
     const user = JSON.parse(rawUser);
     if (allowedRole && user.role !== allowedRole) {
-      if (user.role === 'admin_dp3a') return <Navigate to="/dashboard-dp3a" replace />;
-      if (user.role === 'admin_kelurahan') return <Navigate to="/dashboard-kelurahan" replace />;
       return <Navigate to="/login" replace />;
     }
   } catch (e) {
@@ -36,20 +34,22 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         
-        {/* Protected Routes */}
+        {/* Dashboard Petugas UPTD PPA */}
         <Route 
           path="/dashboard-dp3a" 
           element={
-            <ProtectedRoute allowedRole="admin_dp3a">
+            <ProtectedRoute allowedRole="petugas_uptd">
               <DashboardDP3A />
             </ProtectedRoute>
           } 
         />
+
+        {/* Dashboard Super Admin */}
         <Route 
-          path="/dashboard-kelurahan" 
+          path="/superadmin" 
           element={
-            <ProtectedRoute allowedRole="admin_kelurahan">
-              <DashboardKelurahan />
+            <ProtectedRoute allowedRole="super_admin">
+              <DashboardSuperAdmin />
             </ProtectedRoute>
           } 
         />

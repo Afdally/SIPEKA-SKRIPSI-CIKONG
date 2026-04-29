@@ -30,10 +30,10 @@ export default function LoginPage() {
   }, []);
 
   const redirectBasedOnRole = (role) => {
-    if (role === 'admin_dp3a' || role === 'admin') {
-      navigate('/dashboard-dp3a');
+    if (role === 'super_admin') {
+      navigate('/superadmin', { replace: true });
     } else {
-      navigate('/dashboard-kelurahan');
+      navigate('/dashboard-dp3a', { replace: true });
     }
   };
 
@@ -85,7 +85,7 @@ export default function LoginPage() {
           
           <h2 className="auth-left-title">Portal Pelayanan<br/>Terintegrasi IRCM<br/>Kota Kendari</h2>
           <p className="auth-left-desc">
-            Akses khusus bagi petugas untuk memproses laporan, verifikasi data, dan manajemen penanganan kasus kekerasan secara responsif.
+            Akses khusus bagi Petugas UPTD PPA untuk menerima laporan, melakukan assessment, dan menangani kasus kekerasan secara responsif.
           </p>
         </div>
       </div>
@@ -97,8 +97,8 @@ export default function LoginPage() {
             <i className="bi bi-arrow-left"></i> Kembali ke Beranda
           </Link>
 
-          <h1 className="auth-form-title">Masuk Admin</h1>
-          <p className="auth-form-subtitle">Silakan masukkan akun admin Anda untuk melanjutkan.</p>
+          <h1 className="auth-form-title">Masuk Petugas / Admin</h1>
+          <p className="auth-form-subtitle">Silakan masukkan kredensial Anda untuk melanjutkan.</p>
 
           {errorMsg && (
             <div className="auth-alert-error fade-in">

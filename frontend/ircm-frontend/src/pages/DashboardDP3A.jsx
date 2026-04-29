@@ -1,230 +1,110 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import logo from '../assets/logo.png';
 
 const API_REPORT = 'http://localhost:8080/api';
-const API_CASE   = 'http://localhost:8080/api';
-const API_AUTH   = 'http://localhost:8080/api';
+const API_CASE = 'http://localhost:8080/api';
 
-/* ── CSS injected once ── */
 const style = `
   :root {
-    --biru-utama: #1a56db;
-    --biru-gelap: #1e3a8a;
-    --biru-muda:  #e8f0fb;
-    --border-dp3: #e2e8f0;
+    --primary: #4f46e5;
+    --primary-light: #eef2ff;
+    --slate-50: #f8fafc;
+    --slate-100: #f1f5f9;
   }
+  .dp3a-body { background: var(--slate-50); font-family: 'Segoe UI', sans-serif; color: #1e293b; }
+  .dp3a-sidebar { width: 260px; min-height: 100vh; background: #0f172a; position: fixed; top: 0; left: 0; z-index: 1000; display: flex; flex-direction: column; }
+  .dp3a-sidebar .brand { padding: 2rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .dp3a-sidebar .brand h6 { color: #fff; font-weight: 800; letter-spacing: 0.5px; margin: 0; display:flex; align-items:center; gap:10px; }
+  .dp3a-nav-link { color: #94a3b8; padding: 1rem 1.5rem; font-size: .9rem; font-weight: 500; display: flex; align-items: center; gap: .75rem; cursor: pointer; transition: .3s; }
+  .dp3a-nav-link:hover, .dp3a-nav-link.active { color: #fff; background: rgba(255,255,255,0.05); }
+  .dp3a-nav-link.active { color: #38bdf8; position: relative; }
+  .dp3a-nav-link.active::after { content:''; position:absolute; right:0; top:20%; bottom:20%; width:3px; background:#38bdf8; border-radius:3px 0 0 3px; }
+  
+  .dp3a-main { margin-left: 260px; padding: 2rem; }
+  .dp3a-topbar { background: transparent; padding: 0 0 2rem 0; display: flex; align-items: center; justify-content: space-between; }
+  
+  /* Bento UI Style */
+  .bento-card { background: #fff; border-radius: 1.5rem; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); border: 1px solid var(--slate-100); margin-bottom: 1.5rem; }
+  .bento-title { font-weight: 700; color: #0f172a; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px; font-size: 1.1rem; }
+  
+  .bento-stat-card { background: #fff; border-radius: 1.25rem; padding: 1.5rem; border: 1px solid var(--slate-100); display:flex; align-items:center; gap:16px; transition: .3s; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+  .bento-stat-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); border-color: var(--primary); }
+  .bento-stat-icon { width: 52px; height: 52px; border-radius: 1rem; background: var(--primary-light); color: var(--primary); display:flex; align-items:center; justify-content:center; font-size: 1.5rem; }
+  
+  .dp3a-table th { background: #f9fafb; font-size: .75rem; text-transform: uppercase; color: #64748b; padding: 1rem; border-bottom: 1px solid var(--slate-100); }
+  .dp3a-table td { padding: 1.25rem 1rem; font-size: .875rem; vertical-align: middle; border-bottom: 1px solid #f8fafc; color: #334155; }
+  
+  .badge-soft { padding: 0.5rem 0.75rem; border-radius: 8px; font-weight: 600; font-size: 0.7rem; letter-spacing: 0.3px; text-transform: uppercase; }
+  .badge-soft-primary { background: #e0e7ff; color: #4338ca; }
+  .badge-soft-danger { background: #fee2e2; color: #b91c1c; }
+  .badge-soft-warning { background: #fef3c7; color: #92400e; }
+  .badge-soft-success { background: #dcfce7; color: #166534; }
 
-  .dp3a-body {
-    background: #f8fafc;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  }
-
-  /* Sidebar */
-  .dp3a-sidebar {
-    width: 260px; min-height: 100vh;
-    background: var(--biru-gelap);
-    position: fixed; top: 0; left: 0; z-index: 100;
-    display: flex; flex-direction: column;
-  }
-  .dp3a-sidebar .brand {
-    padding: 1.5rem 1.25rem 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-  }
-  .dp3a-sidebar .brand h6 { color: #fff; font-weight: 700; margin: 0; }
-
-  .dp3a-nav-link {
-    color: rgba(255,255,255,0.7);
-    padding: .8rem 1.25rem; font-size: .875rem;
-    display: flex; align-items: center; gap: .75rem;
-    cursor: pointer; transition: .2s;
-    border-left: 4px solid transparent;
-  }
-  .dp3a-nav-link:hover,
-  .dp3a-nav-link.active {
-    color: #fff;
-    background: rgba(255,255,255,0.1);
-    border-left-color: #60a5fa;
-  }
-
-  .dp3a-main { margin-left: 260px; padding: 1.5rem; }
-
-  .dp3a-topbar {
-    background: #fff; border-bottom: 1px solid var(--border-dp3);
-    padding: .75rem 1.5rem;
-    margin: -1.5rem -1.5rem 1.5rem;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-
-  /* Stat Cards – uniform blue border */
-  .dp3a-stat-card {
-    background: #fff; border-radius: 12px; padding: 1.25rem;
-    border: 2px solid var(--biru-utama);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    height: 100%;
-    transition: all .2s;
-  }
-  .dp3a-stat-card:hover {
-    transform: translateY(-3px);
-    border-color: var(--biru-gelap);
-    background: var(--biru-muda);
-  }
-  .dp3a-stat-icon {
-    width: 44px; height: 44px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
-    background: var(--biru-muda); color: var(--biru-utama);
-  }
-
-  /* Section Card */
-  .dp3a-card {
-    background: #fff; border-radius: 12px;
-    border: 1px solid var(--border-dp3);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    overflow: hidden; margin-bottom: 1.5rem;
-  }
-  .dp3a-card-header {
-    padding: 1rem 1.25rem; background: #fff;
-    border-bottom: 1px solid #f1f5f9;
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem;
-  }
-
-  /* Activity items */
-  .activity-item {
-    padding: 12px 15px;
-    border-left: 3px solid var(--biru-utama);
-    margin-bottom: 10px; background: #f8faff; border-radius: 0 8px 8px 0;
-  }
-
-  /* Progress chart */
-  .chart-label {
-    font-size: .75rem; font-weight: 600; color: #64748b;
-    margin-bottom: 4px; display: flex; justify-content: space-between;
-  }
-  .custom-progress { height: 8px; background: #f1f5f9; border-radius: 10px; overflow: hidden; margin-bottom: 15px; }
-  .progress-fill   { height: 100%; background: var(--biru-utama); border-radius: 10px; }
-
-  /* Table */
-  .dp3a-table th {
-    background: #f8fafc; font-size: .75rem; text-transform: uppercase;
-    color: #64748b; padding: 1rem; border-bottom: 2px solid var(--border-dp3) !important;
-  }
-  .dp3a-table td { padding: 1rem; font-size: .875rem; vertical-align: middle; }
-  .dp3a-table tbody tr:hover { background: var(--biru-muda); }
-
-  /* Metode checkbox */
-  .checkbox-item {
-    display: flex; align-items: center; padding: 12px;
-    border: 1.5px solid #eee; border-radius: 10px;
-    margin-bottom: 8px; cursor: pointer; transition: .2s;
-  }
-  .checkbox-item:hover { border-color: var(--biru-utama); }
-  .checkbox-item.selected { background: #f0f7ff; border-color: var(--biru-utama); }
-  .checkbox-item input { width: 18px; height: 18px; margin-right: 12px; }
-
-  /* Empty state */
-  .dp3a-empty { text-align: center; padding: 4rem 2rem; color: #64748b; }
-  .dp3a-empty i { font-size: 3rem; opacity: .2; display: block; margin-bottom: 1rem; }
-
-  /* Metode list item */
-  .metode-item {
-    display: flex; align-items: center; gap: .75rem;
-    padding: .85rem 1rem; border: 1.5px solid #e2e8f0;
-    border-radius: 10px; margin-bottom: 8px;
-    transition: .2s; background: #fff;
-  }
-  .metode-item:hover { border-color: var(--biru-utama); background: var(--biru-muda); }
-  .metode-icon-box {
-    width: 38px; height: 38px; border-radius: 8px;
-    background: var(--biru-muda); color: var(--biru-utama);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1rem; flex-shrink: 0;
-  }
-  .btn-icon { background: none; border: none; cursor: pointer; padding: .25rem .4rem; border-radius: 6px; transition: .15s; }
-  .btn-icon.edit:hover   { background: #dbeafe; color: var(--biru-utama); }
-  .btn-icon.hapus:hover  { background: #fee2e2; color: #dc2626; }
-
-  @media (max-width: 768px) {
-    .dp3a-sidebar { width: 100%; min-height: auto; position: relative; }
-    .dp3a-main { margin-left: 0; }
-  }
+  .btn-logout:hover { background-color: #ef4444 !important; color: white !important; }
 `;
 
-const METODE_LIST = [
-  {
-    nama: 'Konsultasi / Mediasi',
-    icon: 'bi-chat-dots-fill',
-    desc: 'Sesi konsultasi atau mediasi antara pihak terkait untuk mendorong penyelesaian secara damai dan kekeluargaan.',
-    color: '#1a56db', bg: '#dbeafe',
-  },
-  {
-    nama: 'Psikososial',
-    icon: 'bi-heart-pulse-fill',
-    desc: 'Dukungan pemulihan psikologis dan sosial bagi korban, termasuk konseling dan pendampingan trauma.',
-    color: '#0e7490', bg: '#cffafe',
-  },
-  {
-    nama: 'Bantuan Hukum',
-    icon: 'bi-journal-bookmark-fill',
-    desc: 'Pendampingan dan bantuan bagi korban dalam menjalani proses hukum bersama tim advokat DP3A.',
-    color: '#7c3aed', bg: '#ede9fe',
-  },
-];
+const METODE_LIST = ['Konsultasi / Mediasi', 'Psikososial', 'Bantuan Hukum'];
 
 const MENU_ITEMS = [
-  { id: 'beranda',           icon: 'bi-grid-1x2-fill',  label: 'Beranda' },
-  { id: 'laporan-masuk',     icon: 'bi-inbox-fill',      label: 'Laporan Masuk' },
-  { id: 'hasil-klasifikasi', icon: 'bi-journal-check',   label: 'Hasil Klasifikasi' },
-  { id: 'metode',            icon: 'bi-tags-fill',        label: 'Kelola Metode' },
+  { id: 'beranda', icon: 'bi-grid-1x2-fill', label: 'Beranda' },
+  { id: 'laporan-masuk', icon: 'bi-inbox-fill', label: 'Laporan Keseluruhan' },
+  { id: 'assessment', icon: 'bi-clipboard-check', label: 'Proses Assessment' },
+  { id: 'penanganan', icon: 'bi-activity', label: 'Dalam Penanganan' },
+  { id: 'arsip', icon: 'bi-archive-fill', label: 'Arsip Kasus' },
 ];
 
 export default function DashboardDP3A() {
   const navigate = useNavigate();
-  const [user, setUser]             = useState(null);
+  const [user, setUser] = useState(null);
   const [activeMenu, setActiveMenu] = useState('beranda');
-  const [reports, setReports]       = useState([]);
-  const [penanganan, setPenanganan] = useState([]);
-  const [loading, setLoading]       = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  /* Modal klasifikasi laporan */
-  const [showDetailModal, setShowDetailModal]         = useState(false);
-  const [showMetodeModal, setShowMetodeModal]         = useState(false);
-  const [selectedLaporan, setSelectedLaporan]         = useState(null);
-  const [selectedMetode, setSelectedMetode]           = useState('');
-  const [keterangan, setKeterangan]                   = useState('');
-  const [tanggalPenanganan, setTanggalPenanganan]     = useState(new Date().toISOString().split('T')[0]);
-  const [submitting, setSubmitting]                   = useState(false);
+  // Data
+  const [reports, setReports] = useState([]);
+  const [kasusList, setKasusList] = useState([]);
 
-  /* Modal tambah/edit metode */
-  const [showMetodeMasterModal, setShowMetodeMasterModal] = useState(false);
-  const [metodeList, setMetodeList]                       = useState([
-    { id: 1, nama: 'Konsultasi / Mediasi',  deskripsi: 'Sesi konsultasi atau mediasi antara pihak terkait untuk mendorong penyelesaian secara damai.' },
-    { id: 2, nama: 'Psikososial',           deskripsi: 'Dukungan pemulihan psikologis dan sosial bagi korban, termasuk konseling dan pendampingan trauma.' },
-    { id: 3, nama: 'Bantuan Hukum',         deskripsi: 'Pendampingan dan bantuan bagi korban dalam menjalani proses hukum bersama tim advokat DP3A.' },
-  ]);
-  const [editingMetode, setEditingMetode]   = useState(null);   // null = tambah baru
-  const [inpMetodeNama, setInpMetodeNama]   = useState('');
-  const [inpMetodeDesc, setInpMetodeDesc]   = useState('');
+  // Modals state
+  const [showRegModal, setShowRegModal] = useState(false);
+  const [showAssModal, setShowAssModal] = useState(false);
+  const [showIntModal, setShowIntModal] = useState(false);
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+  const [selectedItem, setSelectedItem] = useState(null); // bisa laporan atau kasus
+
+  // Form states
+  const [pesanTindakLanjut, setPesanTindakLanjut] = useState('');
+  const [hasilAssessment, setHasilAssessment] = useState('');
+  const [kondisiKorban, setKondisiKorban] = useState('');
+  const [kebutuhanKorban, setKebutuhanKorban] = useState('');
+  const [metode, setMetode] = useState('');
+  const [rencana, setRencana] = useState('');
+  const [catatanLog, setCatatanLog] = useState('');
 
   const getToken = () => localStorage.getItem('sipeka_token');
 
   const fetchAll = useCallback(async (tok) => {
     setLoading(true);
     try {
-      const [rReports, rPenanganan] = await Promise.all([
-        axios.get(`${API_REPORT}/laporan`,  { headers: { Authorization: `Bearer ${tok || getToken()}` } }),
-        axios.get(`${API_CASE}/penanganan`, { headers: { Authorization: `Bearer ${tok || getToken()}` } }),
+      const [resRep, resKas] = await Promise.all([
+        axios.get(`${API_REPORT}/laporan`, { headers: { Authorization: `Bearer ${tok || getToken()}` } }),
+        axios.get(`${API_CASE}/penanganan`, { headers: { Authorization: `Bearer ${tok || getToken()}` } })
       ]);
-      const dp3aReports = (rReports.data.data || []).filter(
-        r => ['diteruskan_dp3a','sedang_ditangani','selesai'].includes(r.status)
-      );
-      setReports(dp3aReports);
-      setPenanganan(rPenanganan.data || []);
+      setReports(resRep.data.data || []);
+      setKasusList(resKas.data || []);
     } catch (err) {
       console.error(err);
+      if (err.response?.status === 401) {
+        localStorage.clear();
+        navigate('/login');
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const rawUser = localStorage.getItem('sipeka_user');
@@ -234,278 +114,282 @@ export default function DashboardDP3A() {
     fetchAll(tok);
   }, [navigate, fetchAll]);
 
-  const openDetailLaporan = (laporan) => {
-    setSelectedLaporan(laporan);
-    setSelectedMetode('');
-    setKeterangan('');
-    setTanggalPenanganan(new Date().toISOString().split('T')[0]);
-    setShowDetailModal(true);
+  const handleLogout = () => {
+    if (!window.confirm('Keluar dari dashboard?')) return;
+    localStorage.clear();
+    navigate('/login');
   };
 
-  const openKlasifikasiModal = () => {
-    setShowDetailModal(false);
-    setTimeout(() => setShowMetodeModal(true), 300);
-  };
-
-  const submitPenanganan = async () => {
-    if (!selectedMetode) return alert('Pilih metode penanganan terlebih dahulu.');
+  // ACTIONS
+  const submitRegistrasi = async () => {
+    if (!pesanTindakLanjut) return alert('Pesan tindak lanjut wajib diisi');
     setSubmitting(true);
     try {
-      await axios.post(`${API_CASE}/penanganan`, {
-        laporan_id:        String(selectedLaporan.id || selectedLaporan._id),
-        kode_laporan:      selectedLaporan.kode_laporan,
-        metode:            selectedMetode,
-        keterangan,
-        tanggal_penanganan: tanggalPenanganan,
+      await axios.post(`${API_CASE}/penanganan/registrasi`, {
+        laporan_id: selectedItem._id || selectedItem.id,
+        kode_laporan: selectedItem.kode_laporan,
+        pesan_tindak_lanjut: pesanTindakLanjut
       }, { headers: { Authorization: `Bearer ${getToken()}` } });
-      setShowMetodeModal(false);
-      await fetchAll(getToken());
-      setActiveMenu('hasil-klasifikasi');
+      setShowRegModal(false);
+      fetchAll();
+      setActiveMenu('assessment');
     } catch (err) {
-      alert(err.response?.data?.message || 'Gagal menyimpan penanganan.');
+      alert(err.response?.data?.message || 'Error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  /* ── Kelola Metode helpers ── */
-  const openTambahMetode = () => {
-    setEditingMetode(null);
-    setInpMetodeNama('');
-    setInpMetodeDesc('');
-    setShowMetodeMasterModal(true);
-  };
-
-  const openEditMetode = (m) => {
-    setEditingMetode(m);
-    setInpMetodeNama(m.nama);
-    setInpMetodeDesc(m.deskripsi);
-    setShowMetodeMasterModal(true);
-  };
-
-  const saveMetode = () => {
-    if (!inpMetodeNama.trim()) return alert('Nama metode tidak boleh kosong.');
-    if (editingMetode) {
-      setMetodeList(prev => prev.map(m =>
-        m.id === editingMetode.id ? { ...m, nama: inpMetodeNama.trim(), deskripsi: inpMetodeDesc.trim() } : m
-      ));
-    } else {
-      const newId = Date.now();
-      setMetodeList(prev => [...prev, { id: newId, nama: inpMetodeNama.trim(), deskripsi: inpMetodeDesc.trim() }]);
+  const submitAssessment = async () => {
+    if (!hasilAssessment) return alert('Hasil assessment wajib diisi');
+    setSubmitting(true);
+    try {
+      await axios.put(`${API_CASE}/penanganan/${selectedItem._id}/assessment`, {
+        hasil_assessment: hasilAssessment,
+        kondisi_korban: kondisiKorban,
+        kebutuhan_korban: kebutuhanKorban
+      }, { headers: { Authorization: `Bearer ${getToken()}` } });
+      setShowAssModal(false);
+      fetchAll();
+      setActiveMenu('penanganan');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error');
+    } finally {
+      setSubmitting(false);
     }
-    setShowMetodeMasterModal(false);
   };
 
-  const hapusMetode = (id) => {
-    if (!window.confirm('Hapus metode ini?')) return;
-    setMetodeList(prev => prev.filter(m => m.id !== id));
+  const submitIntervensi = async () => {
+    if (!metode) return alert('Metode wajib dipilih');
+    setSubmitting(true);
+    try {
+      await axios.put(`${API_CASE}/penanganan/${selectedItem._id}/intervensi`, {
+        metode_penanganan: metode,
+        rencana_tindakan: rencana
+      }, { headers: { Authorization: `Bearer ${getToken()}` } });
+      setShowIntModal(false);
+      fetchAll();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleLogout = () => {
-    if (!window.confirm('Keluar dari dashboard?')) return;
-    localStorage.removeItem('sipeka_token');
-    localStorage.removeItem('sipeka_user');
-    navigate('/login');
+  const submitLog = async () => {
+    if (!catatanLog) return alert('Catatan log wajib diisi');
+    setSubmitting(true);
+    try {
+      await axios.post(`${API_CASE}/penanganan/${selectedItem._id}/log`, {
+        catatan: catatanLog
+      }, { headers: { Authorization: `Bearer ${getToken()}` } });
+      setShowLogModal(false);
+      fetchAll();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const goTo = (id) => {
-    setActiveMenu(id);
-    fetchAll(getToken());
+  const selesaikanKasus = async (id) => {
+    if (!window.confirm('Yakin ingin menutup kasus ini? Kasus akan diarsipkan dan tidak bisa diubah lagi.')) return;
+    try {
+      await axios.put(`${API_CASE}/penanganan/${id}/selesai`, {}, { headers: { Authorization: `Bearer ${getToken()}` } });
+      fetchAll();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error');
+    }
   };
 
   if (!user) return null;
 
-  const laporanMasuk    = reports.filter(r => r.status === 'diteruskan_dp3a');
-  const sedangDitangani = reports.filter(r => r.status === 'sedang_ditangani');
-  const totalPenanganan = penanganan.length;
-  const tgl = new Date().toLocaleDateString('id-ID', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  // Filtered Data
+  const lapBaru = reports.filter(r => r.status === 'menunggu_registrasi');
+  const kasAss = kasusList.filter(k => k.status === 'registrasi'); // Butuh assessment
+  const kasInt = kasusList.filter(k => k.status === 'assessment' || k.status === 'penanganan');
+  const kasSels = kasusList.filter(k => k.status === 'selesai');
 
-  /* Sebaran per jenis kekerasan dari semua laporan */
-  const allKlasifikasi = reports;
-  const jenisGroups = ['Fisik','Psikis','Seksual','Penelantaran'];
-  const jenisCount = jenisGroups.map(j => ({
-    label: `Kekerasan ${j}`,
-    count: allKlasifikasi.filter(r => r.jenis_kekerasan?.toLowerCase().includes(j.toLowerCase())).length,
-  }));
-  const totalJenis = allKlasifikasi.length || 1;
-
-  /* Progress bar colors */
-  const progressColors = ['var(--biru-utama)','#3b82f6','#ef4444','#f59e0b'];
-
-  /* Recent klasifikasi */
-  const recentKlas = [...penanganan].reverse().slice(0, 3);
-
-  const metodeStats = METODE_LIST.map(m => ({
-    ...m,
-    count: penanganan.filter(p => p.metode === m.nama).length,
-  }));
+  // Helper untuk mendapatkan data laporan utuh
+  const detailData = selectedItem && !selectedItem.kronologi
+    ? (reports.find(r => r.kode_laporan === selectedItem.kode_laporan) || selectedItem)
+    : selectedItem;
 
   return (
-    <div className="dp3a-body" style={{ display:'flex', minHeight:'100vh' }}>
+    <div className="dp3a-body" style={{ display: 'flex', minHeight: '100vh' }}>
       <style>{style}</style>
 
-      {/* ── SIDEBAR ── */}
+      {/* SIDEBAR */}
       <div className="dp3a-sidebar">
         <div className="brand">
-          <h6><i className="bi bi-shield-fill-check me-2" style={{ color:'#60a5fa' }}></i>SIPEKA DP3A</h6>
-          <small style={{ color:'rgba(255,255,255,0.5)', fontSize:'.78rem' }}>Kota Kendari</small>
+          <h6 className="d-flex align-items-center gap-2">
+            <img src={logo} alt="Logo" style={{ width: '32px', height: 'auto' }} />
+            UPTD PPA
+          </h6>
+          <small style={{ color: 'rgba(255,255,255,0.4)', fontSize: '.75rem', fontWeight: '600' }}>Petugas Penanganan</small>
         </div>
-
-        <nav style={{ marginTop:'1rem', flex:1 }}>
+        <nav style={{ marginTop: '1.5rem', flex: 1 }}>
           {MENU_ITEMS.map(item => (
-            <div key={item.id}
-              className={`dp3a-nav-link${activeMenu === item.id ? ' active' : ''}`}
-              onClick={() => goTo(item.id)}>
-              <i className={`bi ${item.icon}`}></i>
-              {item.label}
-              {item.id === 'laporan-masuk' && laporanMasuk.length > 0 && (
-                <span className="badge bg-warning text-dark ms-auto" style={{ fontSize:'.7rem' }}>
-                  {laporanMasuk.length}
-                </span>
-              )}
+            <div key={item.id} className={`dp3a-nav-link${activeMenu === item.id ? ' active' : ''}`} onClick={() => { setActiveMenu(item.id); fetchAll(); }}>
+              <i className={`bi ${item.icon}`}></i> {item.label}
+              {item.id === 'laporan-masuk' && lapBaru.length > 0 && <span className="badge bg-danger ms-auto rounded-pill">{lapBaru.length}</span>}
+              {item.id === 'assessment' && kasAss.length > 0 && <span className="badge bg-warning text-dark ms-auto rounded-pill">{kasAss.length}</span>}
             </div>
           ))}
         </nav>
-
-        <div style={{ padding:'1rem 1.25rem', borderTop:'1px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ color:'rgba(255,255,255,0.7)', fontSize:'.8rem', marginBottom:'.75rem', display:'flex', alignItems:'center', gap:'.5rem' }}>
-            <i className="bi bi-person-circle"></i>{user.name}
-          </div>
-          <button className="btn btn-sm w-100 fw-semibold"
-            style={{ background:'rgba(255,255,255,0.1)', color:'#fff', border:'1px solid rgba(255,255,255,0.2)' }}
-            onClick={handleLogout}>
-            <i className="bi bi-box-arrow-right me-2"></i>Keluar
-          </button>
+        <div style={{ padding: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <button className="btn btn-sm w-100 fw-bold text-white border-secondary rounded-pill" onClick={handleLogout}><i className="bi bi-box-arrow-right me-2"></i>Keluar</button>
         </div>
       </div>
 
-      {/* ── MAIN CONTENT ── */}
-      <div className="dp3a-main" style={{ flex:1, minWidth:0 }}>
+      {/* MAIN CONTENT */}
+      <div className="dp3a-main" style={{ flex: 1 }}>
         <div className="dp3a-topbar">
-          <h5 className="fw-bold m-0" id="page-title">
-            {MENU_ITEMS.find(m => m.id === activeMenu)?.label || 'Dashboard'}
-          </h5>
-          <span className="text-muted small">{tgl}</span>
+          <h5 className="fw-bold m-0 text-dark">{MENU_ITEMS.find(m => m.id === activeMenu)?.label}</h5>
+          <div className="dropdown">
+            <button className="btn btn-light d-flex align-items-center gap-2 border-0 bg-transparent shadow-none dropdown-toggle" type="button" id="userDropdownDP3A" data-bs-toggle="dropdown" aria-expanded="false">
+              <i className="bi bi-person-circle fs-4 text-primary"></i>
+              <span className="fw-bold text-dark">{user?.name}</span>
+            </button>
+            <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-4" aria-labelledby="userDropdownDP3A">
+              <li><div className="dropdown-header text-muted">Petugas: <strong>{user?.email}</strong></div></li>
+              <li><hr className="dropdown-divider" /></li>
+              <li>
+                <button className="dropdown-item text-danger fw-bold d-flex align-items-center gap-2" onClick={handleLogout}>
+                  <i className="bi bi-box-arrow-right"></i> Logout
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
 
-        {/* ══ BERANDA ══ */}
+        {/* BERANDA */}
         {activeMenu === 'beranda' && (
-          <div>
-            {/* Stat Cards */}
-            <div className="row g-3 mb-4">
+          <>
+            <div className="row g-3">
               {[
-                { icon:'bi-inbox',        lbl:'LAPORAN BARU',    num: laporanMasuk.length },
-                { icon:'bi-check-circle', lbl:'DIPROSES',        num: sedangDitangani.length },
-                { icon:'bi-geo-alt',      lbl:'WILAYAH',         num: 64 },
-                { icon:'bi-people',       lbl:'TOTAL KASUS',     num: totalPenanganan },
+                { icon: 'bi-inbox', lbl: 'Menunggu Registrasi', num: lapBaru.length, color: '#ef4444' },
+                { icon: 'bi-clipboard', lbl: 'Perlu Assessment', num: kasAss.length, color: '#f59e0b' },
+                { icon: 'bi-activity', lbl: 'Dalam Penanganan', num: kasInt.length, color: '#3b82f6' },
+                { icon: 'bi-check-circle', lbl: 'Kasus Selesai', num: kasSels.length, color: '#10b981' },
               ].map((s, i) => (
-                <div key={i} className="col-6 col-md-3">
-                  <div className="dp3a-stat-card">
-                    <div className="d-flex align-items-center gap-3">
-                      <div className="dp3a-stat-icon"><i className={`bi ${s.icon}`}></i></div>
-                      <div>
-                        <div className="small text-muted fw-bold">{s.lbl}</div>
-                        <div className="h4 m-0 fw-bold">{s.num}</div>
-                      </div>
+                <div key={i} className="col-md-3">
+                  <div className="bento-stat-card">
+                    <div className="bento-stat-icon" style={{ background: `${s.color}15`, color: s.color }}>
+                      <i className={`bi ${s.icon}`}></i>
+                    </div>
+                    <div>
+                      <div className="small text-muted fw-bold">{s.lbl}</div>
+                      <div className="h4 m-0 fw-bold" style={{ color: '#1e293b' }}>{s.num}</div>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="row g-4">
-              {/* Sebaran Jenis Kekerasan */}
-              <div className="col-lg-6">
-                <div className="dp3a-card p-4 h-100">
-                  <h6 className="fw-bold mb-4">
-                    <i className="bi bi-bar-chart-line me-2 text-primary"></i>Sebaran Jenis Kekerasan
-                  </h6>
-                  {jenisCount.map((j, i) => {
-                    const pct = Math.round((j.count / totalJenis) * 100) || 0;
-                    return (
-                      <div key={j.label}>
-                        <div className="chart-label"><span>{j.label}</span><span>{pct}%</span></div>
-                        <div className="custom-progress">
-                          <div className="progress-fill" style={{ width:`${pct}%`, background: progressColors[i] }}></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+            <div className="bento-card mt-4">
+              <div className="bento-title">
+                <i className="bi bi-exclamation-circle-fill text-danger"></i>
+                <span>Laporan Masuk (Menunggu Registrasi)</span>
               </div>
-
-              {/* Klasifikasi Terbaru */}
-              <div className="col-lg-6">
-                <div className="dp3a-card p-4 h-100">
-                  <h6 className="fw-bold mb-4">
-                    <i className="bi bi-clock-history me-2 text-primary"></i>Klasifikasi Terbaru
-                  </h6>
-                  {recentKlas.length === 0 ? (
-                    <p className="text-muted small text-center">Belum ada data klasifikasi.</p>
-                  ) : recentKlas.map(r => (
-                    <div key={r._id} className="activity-item">
-                      <div className="d-flex justify-content-between align-items-start">
-                        <span className="fw-bold small text-primary">{r.kode_laporan}</span>
-                        <span className="text-muted" style={{ fontSize:'.65rem' }}>
-                          {r.tanggal_penanganan ? new Date(r.tanggal_penanganan).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' }) : '-'}
-                        </span>
-                      </div>
-                      <div className="small text-dark mt-1">Metode: <strong>{r.metode}</strong></div>
-                    </div>
-                  ))}
+              {lapBaru.length === 0 ? (
+                <div className="text-center py-5">
+                  <i className="bi bi-inbox fs-1 text-muted opacity-25"></i>
+                  <p className="text-muted mt-2">Tidak ada laporan baru saat ini</p>
                 </div>
-              </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table dp3a-table mb-0">
+                    <thead>
+                      <tr>
+                        <th>Kode Laporan</th>
+                        <th>Korban</th>
+                        <th>Wilayah</th>
+                        <th>Kekerasan</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lapBaru.map(r => (
+                        <tr key={r.id || r._id}>
+                          <td><code className="fw-bold text-primary" style={{ fontSize: '0.9rem' }}>{r.kode_laporan}</code></td>
+                          <td>
+                            <div className="fw-bold text-dark">{r.nama_korban}</div>
+                            <div className="text-muted small">{r.usia_korban} tahun • {r.jenis_kelamin}</div>
+                          </td>
+                          <td>{r.kelurahan_korban}</td>
+                          <td><span className="badge-soft badge-soft-primary">{r.jenis_kekerasan}</span></td>
+                          <td>
+                            <div className="d-flex gap-2">
+                              <button className="btn btn-sm btn-light border" onClick={() => { setSelectedItem(r); setShowDetailModal(true); }}>
+                                <i className="bi bi-eye"></i>
+                              </button>
+                              <button className="btn btn-sm btn-primary rounded-pill px-3 fw-bold" onClick={() => { setSelectedItem(r); setPesanTindakLanjut(''); setShowRegModal(true); }}>
+                                Registrasi
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          </div>
+          </>
         )}
 
-        {/* ══ LAPORAN MASUK ══ */}
+        {/* LAPORAN KESELURUHAN */}
         {activeMenu === 'laporan-masuk' && (
-          <div className="dp3a-card">
-            <div className="dp3a-card-header">
-              <span className="fw-bold">
-                <i className="bi bi-inbox-fill me-2 text-primary"></i>Laporan Status: DITERUSKAN
-              </span>
-              <button className="btn btn-sm btn-outline-secondary" onClick={() => fetchAll(getToken())}>
-                <i className="bi bi-arrow-clockwise me-1"></i>Refresh
-              </button>
+          <div className="bento-card">
+            <div className="bento-title">
+              <i className="bi bi-inboxes-fill text-primary"></i>
+              <span>Seluruh Laporan Masuk</span>
             </div>
-
-            {loading ? (
-              <div className="text-center py-5">
-                <span className="spinner-border spinner-border-sm me-2"></span>Memuat...
-              </div>
-            ) : laporanMasuk.length === 0 ? (
-              <div className="dp3a-empty">
-                <i className="bi bi-inbox"></i>
-                <p className="fw-semibold mb-1">Belum ada laporan yang diteruskan</p>
-                <small>Laporan dengan status "Diteruskan ke DP3A" akan muncul di sini.</small>
-              </div>
-            ) : (
+            {reports.length === 0 ? <div className="dp3a-empty"><p>Belum ada data laporan</p></div> : (
               <div className="table-responsive">
-                <table className="table align-middle mb-0 dp3a-table">
+                <table className="table dp3a-table mb-0">
                   <thead>
                     <tr>
                       <th>Kode</th>
+                      <th>Tgl Melapor</th>
                       <th>Korban</th>
-                      <th>Jenis Kekerasan</th>
-                      <th>Kelurahan</th>
-                      <th className="text-center">Aksi</th>
+                      <th>Wilayah</th>
+                      <th>Status</th>
+                      <th>Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {laporanMasuk.map(r => (
+                    {reports.map(r => (
                       <tr key={r.id || r._id}>
-                        <td><code className="text-primary fw-bold">{r.kode_laporan}</code></td>
-                        <td className="fw-medium">{r.nama_korban}</td>
-                        <td>
-                          <span className="badge border border-primary text-primary px-2">{r.jenis_kekerasan}</span>
+                        <td><code className="fw-bold text-primary">{r.kode_laporan}</code></td>
+                        <td className="small fw-semibold text-muted">
+                          {r.createdAt ? new Date(r.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                         </td>
-                        <td>{r.kelurahan_korban || '-'}</td>
-                        <td className="text-center">
-                          <button className="btn btn-sm btn-primary fw-semibold" onClick={() => openDetailLaporan(r)}>
-                            Tinjau &amp; Klasifikasi
-                          </button>
+                        <td>
+                          <div className="fw-bold text-dark">{r.nama_korban}</div>
+                          <div className="text-muted small">{r.usia_korban} thn • {r.jenis_kelamin}</div>
+                        </td>
+                        <td>{r.kelurahan_korban}</td>
+                        <td>
+                          <span className={`badge-soft ${
+                            r.status === 'selesai' ? 'badge-soft-success' : 
+                            r.status === 'menunggu_registrasi' ? 'badge-soft-danger' : 'badge-soft-warning'
+                          }`}>
+                            {r.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="d-flex gap-2">
+                            <button className="btn btn-sm btn-light border" onClick={() => { setDetailData(r); setShowDetailModal(true); }}>
+                              <i className="bi bi-eye"></i>
+                            </button>
+                            {r.status === 'menunggu_registrasi' && (
+                              <button className="btn btn-sm btn-primary rounded-pill px-3 fw-bold" onClick={() => { setSelectedItem(r); setPesanTindakLanjut(''); setShowRegModal(true); }}>
+                                Registrasi
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -516,63 +400,45 @@ export default function DashboardDP3A() {
           </div>
         )}
 
-        {/* ══ HASIL KLASIFIKASI ══ */}
-        {activeMenu === 'hasil-klasifikasi' && (
-          <div className="dp3a-card">
-            <div className="dp3a-card-header">
-              <span className="fw-bold">
-                <i className="bi bi-journal-check me-2 text-primary"></i>Laporan Terklasifikasi
-              </span>
-              <button className="btn btn-sm btn-outline-secondary" onClick={() => fetchAll(getToken())}>
-                <i className="bi bi-arrow-clockwise me-1"></i>Refresh
-              </button>
+        {/* ASSESSMENT */}
+        {activeMenu === 'assessment' && (
+          <div className="bento-card">
+            <div className="bento-title">
+              <i className="bi bi-clipboard-check text-warning"></i>
+              <span>Kasus Menunggu Assessment</span>
             </div>
-
-            {loading ? (
-              <div className="text-center py-5">
-                <span className="spinner-border spinner-border-sm me-2"></span>Memuat...
-              </div>
-            ) : penanganan.length === 0 ? (
-              <div className="dp3a-empty">
-                <i className="bi bi-journal-x"></i>
-                <p className="fw-semibold mb-1">Belum ada data penanganan</p>
-              </div>
-            ) : (
+            {kasAss.length === 0 ? <div className="dp3a-empty"><p>Belum ada kasus menunggu assessment</p></div> : (
               <div className="table-responsive">
-                <table className="table align-middle mb-0 dp3a-table">
+                <table className="table dp3a-table mb-0">
                   <thead>
                     <tr>
-                      <th>Kode</th>
-                      <th>Metode Terpilih</th>
-                      <th>Tgl Input</th>
-                      <th>Petugas</th>
-                      <th>Status</th>
+                      <th>Kode Laporan</th>
+                      <th>Korban</th>
+                      <th>Tgl Registrasi</th>
+                      <th>Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {penanganan.map(p => {
-                      const m = METODE_LIST.find(x => x.nama === p.metode) || {};
-                      return (
-                        <tr key={p._id}>
-                          <td><code className="text-primary fw-bold">{p.kode_laporan}</code></td>
-                          <td>
-                            <span className="badge border border-primary text-primary px-2">{p.metode}</span>
-                          </td>
-                          <td className="text-muted">
-                            {p.tanggal_penanganan
-                              ? new Date(p.tanggal_penanganan).toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' })
-                              : '-'}
-                          </td>
-                          <td style={{ fontSize:'.85rem' }}>{p.admin_name || '-'}</td>
-                          <td>
-                            <span className={`badge rounded-pill px-3 fw-semibold ${p.status === 'selesai' ? 'bg-success' : 'bg-warning text-dark'}`}
-                              style={{ fontSize:'.75rem' }}>
-                              {p.status === 'selesai' ? 'Selesai' : 'Sedang Proses'}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {kasAss.map(k => (
+                      <tr key={k._id}>
+                        <td><code className="fw-bold text-primary">{k.kode_laporan}</code></td>
+                        <td>
+                          <div className="fw-bold text-dark">{k.nama_korban}</div>
+                          <div className="text-muted small">{k.usia_korban} thn • {k.jenis_kelamin}</div>
+                        </td>
+                        <td>{new Date(k.tanggal_registrasi).toLocaleDateString('id-ID')}</td>
+                        <td>
+                          <div className="d-flex gap-2">
+                            <button className="btn btn-sm btn-light border" onClick={() => { setSelectedItem(k); setShowDetailModal(true); }}>
+                              <i className="bi bi-eye"></i>
+                            </button>
+                            <button className="btn btn-sm btn-warning rounded-pill px-3 fw-bold text-dark" onClick={() => { setSelectedItem(k); setHasilAssessment(''); setKondisiKorban(''); setKebutuhanKorban(''); setShowAssModal(true); }}>
+                              Input Assessment
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -580,204 +446,251 @@ export default function DashboardDP3A() {
           </div>
         )}
 
-        {/* ══ KELOLA METODE ══ */}
-        {activeMenu === 'metode' && (
-          <div className="dp3a-card">
-            <div className="dp3a-card-header">
-              <span className="fw-bold">
-                <i className="bi bi-gear-fill me-2 text-primary"></i>Master Metode Penanganan
-              </span>
-              <button className="btn btn-sm btn-primary px-3" onClick={openTambahMetode}>
-                <i className="bi bi-plus-lg me-1"></i>Tambah Metode
-              </button>
+        {/* DALAM PENANGANAN */}
+        {activeMenu === 'penanganan' && (
+          <div className="bento-card">
+            <div className="bento-title">
+              <i className="bi bi-activity text-info"></i>
+              <span>Kasus Dalam Penanganan Aktif</span>
             </div>
-            <div className="p-4">
-              {metodeList.length === 0 ? (
-                <div className="dp3a-empty">
-                  <i className="bi bi-tags"></i>
-                  <p className="fw-semibold">Belum ada metode</p>
-                </div>
-              ) : (
-                metodeList.map(m => {
-                  const base = METODE_LIST.find(x => x.nama === m.nama);
-                  const usedCount = penanganan.filter(p => p.metode === m.nama).length;
-                  return (
-                    <div key={m.id} className="metode-item">
-                      <div className="metode-icon-box">
-                        <i className={`bi ${base?.icon || 'bi-tag-fill'}`}></i>
-                      </div>
-                      <div className="flex-grow-1">
-                        <div className="fw-bold small">{m.nama}</div>
-                        <div className="text-muted" style={{ fontSize:'.75rem' }}>{m.deskripsi}</div>
-                      </div>
-                      <span className="badge rounded-pill px-3 fw-semibold me-2"
-                        style={{ background: base?.bg || '#f1f5f9', color: base?.color || '#374151', fontSize:'.75rem' }}>
-                        {usedCount} Kasus
-                      </span>
-                      <button className="btn-icon edit" title="Edit" onClick={() => openEditMetode(m)}>
-                        <i className="bi bi-pencil text-primary"></i>
-                      </button>
-                      <button className="btn-icon hapus" title="Hapus" onClick={() => hapusMetode(m.id)}>
-                        <i className="bi bi-trash text-danger"></i>
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-              <div className="alert alert-info border-0 rounded-3 small mt-3 mb-0">
-                <i className="bi bi-info-circle me-2"></i>
-                Metode penanganan ditetapkan berdasarkan kebijakan DPPPA Kota Kendari.
+            {kasInt.length === 0 ? <div className="dp3a-empty"><p>Tidak ada kasus dalam penanganan</p></div> : (
+              <div className="table-responsive">
+                <table className="table dp3a-table mb-0">
+                  <thead>
+                    <tr>
+                      <th>Kode</th>
+                      <th>Status</th>
+                      <th>Metode</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {kasInt.map(k => (
+                      <tr key={k._id}>
+                        <td><code className="fw-bold text-primary">{k.kode_laporan}</code></td>
+                        <td><span className="badge-soft badge-soft-warning">{k.status.replace('_', ' ')}</span></td>
+                        <td><span className="fw-semibold">{k.metode_penanganan || '-'}</span></td>
+                        <td>
+                          {k.status === 'assessment' ? (
+                            <button className="btn btn-sm btn-primary rounded-pill px-4 fw-bold" onClick={() => { setSelectedItem(k); setMetode(''); setRencana(''); setShowIntModal(true); }}>Tentukan Metode</button>
+                          ) : (
+                            <div className="d-flex gap-2">
+                              <button className="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold" onClick={() => { setSelectedItem(k); setCatatanLog(''); setShowLogModal(true); }}>+ Log</button>
+                              <button className="btn btn-sm btn-success rounded-pill px-3 fw-bold" onClick={() => selesaikanKasus(k._id)}>Selesaikan</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ARSIP */}
+        {activeMenu === 'arsip' && (
+          <div className="bento-card">
+            <div className="bento-title">
+              <i className="bi bi-archive-fill text-secondary"></i>
+              <span>Arsip Kasus Selesai</span>
             </div>
+            {kasSels.length === 0 ? <div className="dp3a-empty"><p>Arsip kosong</p></div> : (
+              <div className="table-responsive">
+                <table className="table dp3a-table mb-0">
+                  <thead>
+                    <tr>
+                      <th>Kode Laporan</th>
+                      <th>Metode Penanganan</th>
+                      <th>Tanggal Selesai</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {kasSels.map(k => (
+                      <tr key={k._id}>
+                        <td><code className="fw-bold text-primary">{k.kode_laporan}</code></td>
+                        <td><span className="fw-bold">{k.metode_penanganan}</span></td>
+                        <td className="text-muted fw-semibold">{new Date(k.tanggal_selesai).toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* ── MODAL DETAIL LAPORAN ── */}
-      {showDetailModal && selectedLaporan && (
-        <div className="modal fade show d-block" style={{ background:'rgba(0,0,0,0.55)', zIndex:1050 }}>
+      {/* MODALS */}
+      {/* Detail Laporan Modal */}
+      {showDetailModal && detailData && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-lg">
-            <div className="modal-content border-0 rounded-4 shadow">
-              <div className="modal-header" style={{ background:'#1e3a8a', color:'#fff' }}>
-                <h6 className="modal-title fw-bold">Detail Laporan</h6>
-                <button type="button" className="btn-close btn-close-white" onClick={() => setShowDetailModal(false)}></button>
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Detail Laporan: {detailData.kode_laporan}</h5>
+                <button type="button" className="btn-close" onClick={() => setShowDetailModal(false)}></button>
               </div>
-              <div className="modal-body p-4">
+              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                 <div className="row g-3">
                   <div className="col-md-6">
-                    <small className="text-muted">Kode Laporan</small>
-                    <div className="fw-bold font-monospace text-primary">{selectedLaporan.kode_laporan}</div>
+                    <h6 className="fw-bold border-bottom pb-2 text-primary">Data Pelapor</h6>
+                    {detailData.anonim ? (
+                      <p className="text-muted fst-italic">Pelapor memilih Anonim (Identitas Dirahasiakan)</p>
+                    ) : (
+                      <>
+                        <p className="mb-1"><strong>Nama:</strong> {detailData.nama_pelapor || '-'}</p>
+                        <p className="mb-1"><strong>Telepon:</strong> {detailData.telepon_pelapor || '-'}</p>
+                        <p className="mb-1"><strong>Hubungan dg Korban:</strong> {detailData.hubungan_korban || '-'}</p>
+                      </>
+                    )}
                   </div>
                   <div className="col-md-6">
-                    <small className="text-muted">Kelurahan</small>
-                    <div className="fw-bold">{selectedLaporan.kelurahan_korban || '-'}</div>
+                    <h6 className="fw-bold border-bottom pb-2 text-primary">Data Korban</h6>
+                    <p className="mb-1"><strong>Nama:</strong> {detailData.nama_korban}</p>
+                    <p className="mb-1"><strong>Usia:</strong> {detailData.usia_korban} tahun</p>
+                    <p className="mb-1"><strong>Jenis Kelamin:</strong> {detailData.jenis_kelamin}</p>
+                    <p className="mb-1"><strong>Kelurahan:</strong> {detailData.kelurahan_korban}</p>
+                    <p className="mb-1"><strong>Alamat Lengkap:</strong> {detailData.alamat_korban}</p>
                   </div>
-                  <div className="col-md-6">
-                    <small className="text-muted">Nama Korban</small>
-                    <div className="fw-bold">{selectedLaporan.nama_korban}</div>
-                  </div>
-                  <div className="col-md-6">
-                    <small className="text-muted">Jenis Kekerasan</small>
-                    <div className="fw-bold">{selectedLaporan.jenis_kekerasan}</div>
-                  </div>
-                  <div className="col-12">
-                    <small className="text-muted">Kronologi</small>
-                    <div className="p-3 border rounded bg-light small mt-1" style={{ lineHeight:1.7 }}>
-                      {selectedLaporan.kronologi || <span className="text-muted fst-italic">Tidak tersedia.</span>}
+                  <div className="col-12 mt-3">
+                    <h6 className="fw-bold border-bottom pb-2 text-primary">Detail Kejadian</h6>
+                    <p className="mb-1"><strong>Jenis Kekerasan:</strong> {detailData.jenis_kekerasan}</p>
+                    <p className="mb-1">
+                      <strong>Tanggal Kejadian:</strong>{' '}
+                      {(() => {
+                        const d = new Date(detailData.tanggal_kejadian);
+                        return isNaN(d.getTime()) ? '-' : (detailData.tanggal_kejadian_format || d.toLocaleDateString('id-ID'));
+                      })()}
+                    </p>
+                    <p className="mb-1"><strong>Lokasi Kejadian:</strong> {detailData.lokasi_kejadian}</p>
+                    <p className="mb-1">
+                      <strong>Preferensi Layanan:</strong>{' '}
+                      <span className={`badge ${detailData.preferensi_layanan === 'Datang ke UPTD' ? 'bg-primary' : 'bg-danger'}`}>
+                        {detailData.preferensi_layanan || 'Datang ke UPTD'}
+                      </span>
+                    </p>
+                    <p className="mb-2"><strong>Kronologi:</strong></p>
+                    <div className="p-3 bg-light rounded text-dark" style={{ whiteSpace: 'pre-wrap' }}>
+                      {detailData.kronologi}
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="modal-footer border-0">
-                <button className="btn btn-light" onClick={() => setShowDetailModal(false)}>Tutup</button>
-                <button className="btn btn-primary w-100" onClick={openKlasifikasiModal}>
-                  Pilih Metode Penanganan
-                </button>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setShowDetailModal(false)}>Tutup</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── MODAL TAMBAH / EDIT METODE ── */}
-      {showMetodeMasterModal && (
-        <div className="modal fade show d-block" style={{ background:'rgba(0,0,0,0.55)', zIndex:1070 }}>
-          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth:480 }}>
-            <div className="modal-content border-0 rounded-4 shadow">
-              <div className="modal-header border-0 pb-0">
-                <h6 className="modal-title fw-bold">
-                  {editingMetode ? 'Edit Metode' : 'Tambah Metode'}
-                </h6>
-                <button type="button" className="btn-close" onClick={() => setShowMetodeMasterModal(false)}></button>
+      {/* Registrasi Modal */}
+      {showRegModal && selectedItem && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Terima Laporan {selectedItem.kode_laporan}</h5>
+                <button type="button" className="btn-close" onClick={() => setShowRegModal(false)}></button>
               </div>
-              <div className="modal-body p-4">
+              <div className="modal-body">
                 <div className="mb-3">
-                  <label className="form-label small fw-bold">Nama Metode <span className="text-danger">*</span></label>
-                  <input type="text" className="form-control"
-                    placeholder="Contoh: Konsultasi"
-                    value={inpMetodeNama}
-                    onChange={e => setInpMetodeNama(e.target.value)} />
-                </div>
-                <div className="mb-0">
-                  <label className="form-label small fw-bold">Deskripsi</label>
-                  <textarea className="form-control" rows={3}
-                    placeholder="Detail layanan..."
-                    value={inpMetodeDesc}
-                    onChange={e => setInpMetodeDesc(e.target.value)} />
+                  <label className="form-label small fw-bold">Pesan Tindak Lanjut untuk Pelapor</label>
+                  <textarea className="form-control" rows={3} placeholder="Contoh: Silakan datang ke kantor UPTD besok jam 09:00" value={pesanTindakLanjut} onChange={e => setPesanTindakLanjut(e.target.value)}></textarea>
                 </div>
               </div>
-              <div className="modal-footer border-0 pt-0">
-                <button className="btn btn-light btn-sm" onClick={() => setShowMetodeMasterModal(false)}>Batal</button>
-                <button className="btn btn-primary btn-sm px-4" onClick={saveMetode}>
-                  <i className="bi bi-check-circle me-1"></i>
-                  {editingMetode ? 'Simpan Perubahan' : 'Tambah Metode'}
-                </button>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setShowRegModal(false)}>Batal</button>
+                <button className="btn btn-primary" onClick={submitRegistrasi} disabled={submitting}>Simpan & Registrasi</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── MODAL PILIH METODE ── */}
-      {showMetodeModal && selectedLaporan && (
-        <div className="modal fade show d-block" style={{ background:'rgba(0,0,0,0.55)', zIndex:1060 }}>
-          <div className="modal-dialog" style={{ maxWidth:540 }}>
-            <div className="modal-content border-0 rounded-4 shadow">
-              <div className="modal-header" style={{ background:'#1e3a8a', color:'#fff' }}>
-                <div>
-                  <h6 className="modal-title fw-bold mb-0">Klasifikasi Penanganan</h6>
-                  <small style={{ opacity:.7 }}>{selectedLaporan.kode_laporan}</small>
-                </div>
-                <button type="button" className="btn-close btn-close-white" onClick={() => setShowMetodeModal(false)}></button>
+      {/* Assessment Modal */}
+      {showAssModal && selectedItem && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Input Assessment {selectedItem.kode_laporan}</h5>
+                <button type="button" className="btn-close" onClick={() => setShowAssModal(false)}></button>
               </div>
-              <div className="modal-body p-4">
-                <p className="small text-muted mb-3">
-                  Tentukan metode untuk laporan <strong>{selectedLaporan.kode_laporan}</strong>
-                </p>
-
-                {metodeList.map(m => {
-                  const base = METODE_LIST.find(x => x.nama === m.nama);
-                  return (
-                    <div key={m.id}
-                      className={`checkbox-item${selectedMetode === m.nama ? ' selected' : ''}`}
-                      onClick={() => setSelectedMetode(m.nama)}>
-                      <input type="checkbox" readOnly checked={selectedMetode === m.nama}
-                        style={{ accentColor: base?.color || '#1a56db' }} />
-                      <div>
-                        <div className="small fw-bold" style={{ color: selectedMetode === m.nama ? (base?.color || '#1a56db') : '#111827' }}>
-                          <i className={`bi ${base?.icon || 'bi-tag-fill'} me-1`}></i>{m.nama}
-                        </div>
-                        <div className="text-muted" style={{ fontSize:'.75rem', marginTop:2 }}>{m.deskripsi}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                <div className="mt-4 row g-3">
-                  <div className="col-md-6">
-                    <label className="form-label small fw-bold">Tanggal Penanganan <span className="text-danger">*</span></label>
-                    <input type="date" className="form-control"
-                      value={tanggalPenanganan}
-                      max={new Date().toISOString().split('T')[0]}
-                      onChange={e => setTanggalPenanganan(e.target.value)} />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label small fw-bold">Catatan Penanganan</label>
-                    <textarea className="form-control" rows={3} style={{ resize:'none' }}
-                      placeholder="Catatan tambahan..."
-                      value={keterangan} onChange={e => setKeterangan(e.target.value)} />
-                  </div>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label small fw-bold">Hasil Assessment / Wawancara</label>
+                  <textarea className="form-control" rows={3} value={hasilAssessment} onChange={e => setHasilAssessment(e.target.value)}></textarea>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label small fw-bold">Kondisi Korban</label>
+                  <input type="text" className="form-control" value={kondisiKorban} onChange={e => setKondisiKorban(e.target.value)} />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label small fw-bold">Kebutuhan Mendesak</label>
+                  <input type="text" className="form-control" value={kebutuhanKorban} onChange={e => setKebutuhanKorban(e.target.value)} />
                 </div>
               </div>
-              <div className="modal-footer border-0">
-                <button className="btn btn-light btn-sm" onClick={() => setShowMetodeModal(false)} disabled={submitting}>
-                  Batal
-                </button>
-                <button className="btn btn-success btn-sm px-4 fw-semibold" onClick={submitPenanganan} disabled={submitting}>
-                  {submitting
-                    ? <><span className="spinner-border spinner-border-sm me-1"></span>Menyimpan...</>
-                    : <><i className="bi bi-check-circle me-1"></i>Simpan Klasifikasi</>}
-                </button>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setShowAssModal(false)}>Batal</button>
+                <button className="btn btn-primary" onClick={submitAssessment} disabled={submitting}>Simpan Assessment</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Intervensi Modal */}
+      {showIntModal && selectedItem && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Rencana Intervensi {selectedItem.kode_laporan}</h5>
+                <button type="button" className="btn-close" onClick={() => setShowIntModal(false)}></button>
+              </div>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label small fw-bold">Metode Penanganan</label>
+                  <select className="form-select" value={metode} onChange={e => setMetode(e.target.value)}>
+                    <option value="">-- Pilih --</option>
+                    {METODE_LIST.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div className="mb-3">
+                  <label className="form-label small fw-bold">Rencana Tindakan</label>
+                  <textarea className="form-control" rows={3} value={rencana} onChange={e => setRencana(e.target.value)}></textarea>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setShowIntModal(false)}>Batal</button>
+                <button className="btn btn-primary" onClick={submitIntervensi} disabled={submitting}>Mulai Penanganan</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Modal */}
+      {showLogModal && selectedItem && (
+        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Tambah Log {selectedItem.kode_laporan}</h5>
+                <button type="button" className="btn-close" onClick={() => setShowLogModal(false)}></button>
+              </div>
+              <div className="modal-body">
+                <div className="mb-3">
+                  <label className="form-label small fw-bold">Catatan Pendampingan</label>
+                  <textarea className="form-control" rows={3} value={catatanLog} onChange={e => setCatatanLog(e.target.value)}></textarea>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setShowLogModal(false)}>Batal</button>
+                <button className="btn btn-primary" onClick={submitLog} disabled={submitting}>Simpan Log</button>
               </div>
             </div>
           </div>

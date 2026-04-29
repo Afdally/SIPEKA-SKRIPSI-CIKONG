@@ -15,7 +15,7 @@ services:
       - ircm-network
 
   # ============================================
-  # BACKEND CONTAINERS (4 Express Services)
+  # BACKEND CONTAINERS (3 Express Services)
   # ============================================
 
   auth-service:
@@ -48,26 +48,6 @@ services:
       PORT: 8000
     volumes:
       - ./backend/reporting-service:/usr/src/app
-      - /usr/src/app/node_modules
-    depends_on:
-      - mongodb
-      - auth-service
-    networks:
-      - ircm-network
-
-  verification-service:
-    build:
-      context: ./backend/verification-service
-      dockerfile: Dockerfile
-    container_name: ircm-verification-service
-    restart: unless-stopped
-    environment:
-      MONGODB_URI: mongodb://mongodb:27017/verification_db
-      JWT_SECRET: ircm_secret_key
-      PORT: 8000
-      REPORT_SERVICE_URL: http://report-service:8000
-    volumes:
-      - ./backend/verification-service:/usr/src/app
       - /usr/src/app/node_modules
     depends_on:
       - mongodb
@@ -110,7 +90,6 @@ services:
     depends_on:
       - auth-service
       - report-service
-      - verification-service
       - case-service
     networks:
       - ircm-network
@@ -133,7 +112,6 @@ services:
     depends_on:
       - auth-service
       - report-service
-      - verification-service
       - case-service
     networks:
       - ircm-network

@@ -7,12 +7,11 @@ const JWT_TTL    = parseInt(process.env.JWT_TTL || '3600');
 function generateToken(user) {
   return jwt.sign(
     {
-      sub:       user._id,
-      id:        user._id,
-      name:      user.name,
-      email:     user.email,
-      role:      user.role,
-      kelurahan: user.kelurahan,
+      sub:   user._id,
+      id:    user._id,
+      name:  user.name,
+      email: user.email,
+      role:  user.role,
     },
     JWT_SECRET,
     { expiresIn: JWT_TTL }
@@ -45,11 +44,10 @@ exports.login = async (req, res) => {
       token_type:   'bearer',
       expires_in:   JWT_TTL,
       user: {
-        id:        user._id,
-        name:      user.name,
-        email:     user.email,
-        role:      user.role,
-        kelurahan: user.kelurahan,
+        id:    user._id,
+        name:  user.name,
+        email: user.email,
+        role:  user.role,
       },
     });
   } catch (err) {
@@ -60,7 +58,6 @@ exports.login = async (req, res) => {
 
 // POST /api/auth/logout
 exports.logout = (req, res) => {
-  // JWT stateless — client cukup hapus token
   return res.json({ message: 'Berhasil logout' });
 };
 
@@ -70,18 +67,17 @@ exports.me = async (req, res) => {
     const user = await User.findById(req.auth_user.id).select('-password');
     if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
     return res.json({
-      id:        user._id,
-      name:      user.name,
-      email:     user.email,
-      role:      user.role,
-      kelurahan: user.kelurahan,
+      id:    user._id,
+      name:  user.name,
+      email: user.email,
+      role:  user.role,
     });
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });
   }
 };
 
-// GET /api/auth/validate  — dipanggil service lain untuk verifikasi token
+// GET /api/auth/validate — dipanggil service lain untuk verifikasi token
 exports.validateToken = (req, res) => {
   const header = req.headers['authorization'] || '';
   const token  = header.startsWith('Bearer ') ? header.slice(7) : null;
@@ -95,11 +91,10 @@ exports.validateToken = (req, res) => {
     return res.json({
       valid: true,
       user: {
-        id:        decoded.id || decoded.sub,
-        name:      decoded.name,
-        email:     decoded.email,
-        role:      decoded.role,
-        kelurahan: decoded.kelurahan,
+        id:    decoded.id || decoded.sub,
+        name:  decoded.name,
+        email: decoded.email,
+        role:  decoded.role,
       },
     });
   } catch (err) {
@@ -107,21 +102,31 @@ exports.validateToken = (req, res) => {
   }
 };
 
-// POST /api/auth/users — hanya admin_dp3a
+// ==========================================
+// USER MANAGEMENT (SUPER ADMIN ONLY)
+// ==========================================
+
+// GET /api/auth/users
+exports.getUsers = async (req, res) => {
+  try {
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    return res.json(users);
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// POST /api/auth/users
 exports.createUser = async (req, res) => {
   try {
-    const { name, email, password, role, kelurahan } = req.body;
+    const { name, email, password, role } = req.body;
 
     if (!name || !email || !password || !role) {
       return res.status(422).json({ message: 'name, email, password, role wajib diisi' });
     }
 
-    if (!['admin_dp3a', 'admin_kelurahan'].includes(role)) {
+    if (!['petugas_uptd', 'super_admin'].includes(role)) {
       return res.status(422).json({ message: 'Role tidak valid' });
-    }
-
-    if (role === 'admin_kelurahan' && !kelurahan) {
-      return res.status(422).json({ message: 'Kelurahan wajib diisi untuk admin kelurahan' });
     }
 
     const exists = await User.findOne({ email: email.toLowerCase() });
@@ -129,20 +134,60 @@ exports.createUser = async (req, res) => {
       return res.status(422).json({ message: 'Email sudah terdaftar' });
     }
 
-    const user = await User.create({ name, email, password, role, kelurahan: kelurahan || null });
+    const user = await User.create({ name, email, password, role });
 
     return res.status(201).json({
       message: 'Akun berhasil dibuat',
       user: {
-        id:        user._id,
-        name:      user.name,
-        email:     user.email,
-        role:      user.role,
-        kelurahan: user.kelurahan,
+        id:    user._id,
+        name:  user.name,
+        email: user.email,
+        role:  user.role,
       },
     });
   } catch (err) {
     console.error('createUser error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// PUT /api/auth/users/:id
+exports.updateUser = async (req, res) => {
+  try {
+    const { name, email, role, password } = req.body;
+    const user = await User.findById(req.params.id);
+    
+    if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
+
+    if (name) user.name = name;
+    if (email) user.email = email.toLowerCase();
+    if (role && ['petugas_uptd', 'super_admin'].includes(role)) user.role = role;
+    if (password) user.password = password; // pre-save hook will hash it
+
+    await user.save();
+
+    return res.json({
+      message: 'Akun berhasil diperbarui',
+      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// DELETE /api/auth/users/:id
+exports.deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
+
+    if (user._id.toString() === req.auth_user.id) {
+      return res.status(403).json({ message: 'Tidak dapat menghapus akun sendiri' });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
+    return res.json({ message: 'Akun berhasil dihapus' });
+  } catch (err) {
     return res.status(500).json({ message: 'Server error' });
   }
 };

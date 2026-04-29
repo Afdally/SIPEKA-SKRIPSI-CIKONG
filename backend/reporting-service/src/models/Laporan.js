@@ -1,21 +1,8 @@
 const mongoose = require('mongoose');
 
-// Generate kode otomatis e.g. LP-2026-X8Y2A
-function generateKode() {
-  const date = new Date();
-  const year = date.getFullYear();
-  
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let randStr = '';
-  for (let i = 0; i < 5; i++) {
-    randStr += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  
-  return `LP-${year}-${randStr}`;
-}
-
 const laporanSchema = new mongoose.Schema({
-  kode_laporan:     { type: String, unique: true, default: generateKode },
+  kode_laporan:     { type: String, unique: true },
+  tipe_laporan:     { type: String, enum: ['anak', 'perempuan'], default: 'perempuan' },
   anonim:           { type: Boolean, default: false },
   
   // Pelapor
@@ -36,12 +23,30 @@ const laporanSchema = new mongoose.Schema({
   jenis_kekerasan:  { type: String, required: true },
   tanggal_kejadian: { type: Date, required: true },
   lokasi_kejadian:  { type: String, required: true },
+  latitude:         { type: Number, default: null }, // Koordinat peta
+  longitude:        { type: Number, default: null }, // Koordinat peta
   kronologi:        { type: String, required: true },
   bukti_file:       { type: String, default: null },
+  preferensi_layanan: { type: String, default: 'Datang ke UPTD' },
   
   // Status
-  status:           { type: String, default: 'menunggu_verifikasi' },
+  status:           { type: String, default: 'menunggu_registrasi' },
   catatan:          { type: String, default: null },
 }, { timestamps: true });
+
+laporanSchema.pre('save', function(next) {
+  if (this.kode_laporan) return next();
+
+  const year = new Date().getFullYear();
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let randStr = '';
+  for (let i = 0; i < 5; i++) {
+    randStr += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  const prefix = this.tipe_laporan === 'anak' ? 'LA' : 'LP';
+  this.kode_laporan = `${prefix}-${year}-${randStr}`;
+  next();
+});
 
 module.exports = mongoose.model('Laporan', laporanSchema);

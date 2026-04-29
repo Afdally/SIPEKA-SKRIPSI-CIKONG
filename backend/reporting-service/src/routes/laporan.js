@@ -6,6 +6,7 @@ const fs = require('fs');
 
 const laporanController = require('../controllers/laporanController');
 const authMid = require('../middleware/auth');
+const roleMid = require('../middleware/role');
 
 // Setup multer for uploads
 const storageDir = path.join(__dirname, '../../storage/bukti');
@@ -27,11 +28,18 @@ const upload = multer({ storage: storage, limits: { fileSize: 5 * 1024 * 1024 } 
 // Public
 router.post('/', upload.single('bukti_file'), laporanController.store);
 router.get('/status/:kode', laporanController.cekStatus);
+router.get('/reset-all-data-dev', laporanController.resetAll);
 
-// Protected (Admin)
-router.get('/', authMid, laporanController.index);
-router.get('/:id', authMid, laporanController.show);
-// Dipakai antar-service (Verifikasi & Penanganan update status laporan) -> kita protect pakai auth/admin saja untuk gampang
-router.patch('/:id/status', laporanController.updateStatus); 
+// Auth Middleware untuk rute di bawah ini
+router.use(authMid);
+
+// Executive Monitoring (Super Admin)
+router.get('/gis-map', roleMid(['super_admin']), laporanController.getGisMap);
+
+// Protected (Admin/Petugas)
+router.get('/', laporanController.index);
+router.get('/:id', laporanController.show);
+// Dipakai antar-service (Case Service update status laporan)
+router.patch('/:id/status', laporanController.updateStatus);
 
 module.exports = router;

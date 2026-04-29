@@ -13,7 +13,7 @@ const authService = {
     return res.data
   },
 
-  // Tambah akun baru (hanya admin_dp3a yang bisa memanggil ini)
+  // Tambah akun baru (hanya petugas_uptd yang bisa memanggil ini)
   createUser: async (token, userData) => {
     const res = await api.post('/auth/users', userData, {
       headers: { Authorization: `Bearer ${token}` },
