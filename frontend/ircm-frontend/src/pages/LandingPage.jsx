@@ -245,10 +245,10 @@ export default function LandingPage() {
                       <div className="row g-3 text-sm">
                         <div className="col-6"><p className="mb-0 text-muted">Tanggal Lapor</p><p className="fw-bold">{statusResult.createdAt ? new Date(statusResult.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-'}</p></div>
                         <div className="col-6"><p className="mb-0 text-muted">Korban</p><p className="fw-bold">{statusResult.nama_korban}</p></div>
-                        {statusResult.pesan_tindak_lanjut && (
+                        {statusResult.catatan && (
                           <div className="col-12 mt-3 p-3 rounded bg-white border">
                             <p className="mb-1 text-primary fw-bold small"><i className="bi bi-chat-left-dots-fill me-2"></i>Pesan dari Petugas:</p>
-                            <p className="mb-0">{statusResult.pesan_tindak_lanjut}</p>
+                            <p className="mb-0">{statusResult.catatan}</p>
                           </div>
                         )}
                       </div>

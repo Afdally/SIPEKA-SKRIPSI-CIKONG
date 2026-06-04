@@ -1,5 +1,15 @@
 const Laporan = require('../models/Laporan');
 
+// DANGER: Reset all report data (Hanya untuk dev/bersih-bersih)
+exports.resetAll = async (req, res) => {
+  try {
+    await Laporan.deleteMany({});
+    return res.json({ message: 'Database laporan berhasil dibersihkan!' });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 // POST /api/laporan
 exports.store = async (req, res) => {
   try {
@@ -47,6 +57,8 @@ exports.cekStatus = async (req, res) => {
       status: laporan.status,
       jenis_kekerasan: laporan.jenis_kekerasan,
       tanggal_lapor: laporan.createdAt.toLocaleDateString('id-ID'),
+      createdAt: laporan.createdAt,
+      nama_korban: laporan.nama_korban,
       catatan: laporan.catatan,
     });
   } catch (err) {

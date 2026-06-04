@@ -1,8 +1,9 @@
 const mongoose = require('mongoose');
 
 const activityLogSchema = new mongoose.Schema({
-  catatan:    { type: String, required: true },
-  tanggal:    { type: Date, required: true },
+  catatan:      { type: String, required: true },
+  tanggal:      { type: Date, required: true },
+  petugas_name: { type: String, default: 'Sistem' },
 }, { timestamps: true });
 
 const kasusSchema = new mongoose.Schema({

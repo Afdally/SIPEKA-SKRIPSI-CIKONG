@@ -164,6 +164,7 @@ exports.addLog = async (req, res) => {
     kasus.activity_log.push({
       catatan,
       tanggal: tanggal ? new Date(tanggal) : new Date(),
+      petugas_name: req.auth_user.name,
     });
 
     await kasus.save();
