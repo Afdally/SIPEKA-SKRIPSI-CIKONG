@@ -6,67 +6,7 @@ import logo from '../assets/logo.png';
 const API_REPORT = 'http://localhost:8080/api';
 const API_CASE = 'http://localhost:8080/api';
 
-const style = `
-  :root {
-    --primary: #4f46e5;
-    --primary-light: #eef2ff;
-    --slate-50: #f8fafc;
-    --slate-100: #f1f5f9;
-  }
-  .dp3a-body { background: var(--slate-50); font-family: 'Segoe UI', sans-serif; color: #1e293b; }
-  .dp3a-sidebar { width: 260px; min-height: 100vh; background: #0f172a; position: fixed; top: 0; left: 0; z-index: 1000; display: flex; flex-direction: column; }
-  .dp3a-sidebar .brand { padding: 2rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
-  .dp3a-sidebar .brand h6 { color: #fff; font-weight: 800; letter-spacing: 0.5px; margin: 0; display:flex; align-items:center; gap:10px; }
-  .dp3a-nav-link { color: #94a3b8; padding: 1rem 1.5rem; font-size: .95rem; font-weight: 600; display: flex; align-items: center; gap: .75rem; cursor: pointer; transition: .3s; border-radius: 0 2rem 2rem 0; margin-right: 1rem; margin-bottom: 0.25rem;}
-  .dp3a-nav-link:hover, .dp3a-nav-link.active { color: #fff; background: rgba(255,255,255,0.05); }
-  .dp3a-nav-link.active { color: #38bdf8; position: relative; }
-  .dp3a-nav-link.active::after { content:''; position:absolute; right:0; top:20%; bottom:20%; width:3px; background:#38bdf8; border-radius:3px 0 0 3px; }
-  
-  .dp3a-main { margin-left: 260px; padding: 2rem; }
-  .dp3a-topbar { background: transparent; padding: 0 0 2rem 0; display: flex; align-items: center; justify-content: space-between; }
-  
-  .bento-card { background: #fff; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); border: 1px solid var(--slate-100); margin-bottom: 1.5rem; }
-  .bento-title { font-weight: 700; color: #0f172a; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px; font-size: 1.1rem; }
-  
-  .dp3a-table th { background: #f8fafc; font-size: .75rem; text-transform: uppercase; color: #64748b; padding: 1rem; border-bottom: 1px solid var(--slate-100); }
-  .dp3a-table td { padding: 1.25rem 1rem; font-size: .875rem; vertical-align: middle; border-bottom: 1px solid #f8fafc; color: #334155; }
-  
-  .badge-soft { padding: 0.35rem 0.65rem; border-radius: 6px; font-weight: 600; font-size: 0.75rem; letter-spacing: 0.3px; }
-  .badge-soft-primary { background: #eff6ff; color: #2563eb; }
-  .badge-soft-danger { background: #fef2f2; color: #dc2626; }
-  .badge-soft-warning { background: #fffbeb; color: #d97706; }
-  .badge-soft-success { background: #f0fdf4; color: #16a34a; }
-
-  /* Stepper */
-  .stepper-container { display: flex; justify-content: space-between; position: relative; margin-bottom: 2rem; padding: 0 1rem; }
-  .stepper-line { position: absolute; top: 15px; left: 5%; right: 5%; height: 2px; background: #e2e8f0; z-index: 1; }
-  .stepper-line-active { position: absolute; top: 15px; left: 5%; height: 2px; background: var(--primary); z-index: 2; transition: 0.3s; }
-  .stepper-item { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 80px; }
-  .stepper-circle { width: 32px; height: 32px; border-radius: 50%; background: #fff; border: 2px solid #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold; color: #94a3b8; transition: 0.3s; }
-  .stepper-item.completed .stepper-circle { background: var(--primary); border-color: var(--primary); color: #fff; }
-  .stepper-item.active .stepper-circle { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 0 0 4px var(--primary-light); }
-  .stepper-label { font-size: 0.7rem; color: #64748b; text-align: center; font-weight: 600; line-height: 1.2; }
-  .stepper-item.completed .stepper-label, .stepper-item.active .stepper-label { color: #0f172a; }
-  
-  .action-form-box { border-radius: 0.75rem; border: 1px solid var(--primary-light); background: #fff; overflow: hidden; }
-  .action-form-header { background: var(--primary-light); padding: 1rem 1.5rem; border-bottom: 1px solid #e0e7ff; }
-  .action-form-body { padding: 1.5rem; }
-  
-  /* Analytics UI */
-  .border-dashed { border-style: dashed !important; }
-  .bar-chart-mini { display: flex; align-items: flex-end; gap: 1rem; height: 200px; padding-top: 1.5rem; border-bottom: 1px dashed #e2e8f0; }
-  .bar-item-wrapper { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 8px; height: 100%; position: relative; z-index: 1; }
-  .bar-item { width: 100%; max-width: 65px; background: var(--primary-light); border-radius: 6px 6px 2px 2px; transition: 0.3s; position: relative; cursor: pointer; }
-  .bar-item:hover { background: var(--primary); }
-  .bar-item:hover::after { content: attr(data-val); position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; color: var(--primary); background: #fff; padding: 2px 6px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
-  .bar-label { font-size: 0.7rem; color: #64748b; text-align: center; font-weight: 600; }
-  
-  .donut-chart-container { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; }
-  .donut-svg { transform: rotate(-90deg); width: 160px; height: 160px; }
-  .donut-legend { width: 100%; }
-  .legend-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; font-size: 0.85rem; }
-  .legend-color { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
-`;
+import './Dashboard.css';
 
 const METODE_LIST = ['Konsultasi / Mediasi', 'Psikososial', 'Bantuan Hukum'];
 
@@ -78,7 +18,6 @@ const MENU_ITEMS = [
 
 const STEP_STAGES = [
   { id: 'pengaduan', label: 'Pengaduan' },
-  { id: 'penangguhan', label: 'Penangguhan' },
   { id: 'registrasi', label: 'Registrasi' },
   { id: 'assessment', label: 'Assessment' },
   { id: 'intervensi', label: 'Rencana Intervensi' },
@@ -263,9 +202,12 @@ export default function DashboardDP3A() {
   const kasSels = kasusList.filter(k => k.status === 'selesai').map(enrichKasus);
 
   // Detail Data Logic
-  const detailData = selectedItem && !selectedItem.kronologi
-    ? (reports.find(r => r.kode_laporan === selectedItem.kode_laporan) || selectedItem)
-    : selectedItem;
+  let detailData = null;
+  if (selectedItem) {
+    const reportMatch = reports.find(r => r.kode_laporan === selectedItem.kode_laporan) || {};
+    const caseMatch = kasusList.find(k => k.kode_laporan === selectedItem.kode_laporan) || {};
+    detailData = { ...reportMatch, ...caseMatch, ...selectedItem };
+  }
 
   const handleProses = (item) => {
     setSelectedItem(item);
@@ -297,18 +239,17 @@ export default function DashboardDP3A() {
   };
 
   // Determine Stepper Active Index
-  let currentStepIndex = 2; // Default Registrasi
-  if (activeAction === 'assessment') currentStepIndex = 3;
-  if (activeAction === 'intervensi') currentStepIndex = 4;
-  if (activeAction === 'monitoring') currentStepIndex = 5;
-  if (activeAction === 'detail' && selectedItem?.status === 'selesai') currentStepIndex = 6;
+  let currentStepIndex = 1; // Default Registrasi
+  if (activeAction === 'assessment') currentStepIndex = 2;
+  if (activeAction === 'intervensi') currentStepIndex = 3;
+  if (activeAction === 'monitoring') currentStepIndex = 4;
+  if (activeAction === 'detail' && selectedItem?.status === 'selesai') currentStepIndex = 5;
 
   return (
-    <div className="dp3a-body" style={{ display: 'flex', minHeight: '100vh' }}>
-      <style>{style}</style>
+    <div className="dashboard-body" style={{ display: 'flex', minHeight: '100vh' }}>
 
       {/* SIDEBAR */}
-      <div className="dp3a-sidebar">
+      <div className="dashboard-sidebar">
         <div className="brand">
           <h6 className="d-flex align-items-center gap-2">
             <img src={logo} alt="Logo" style={{ width: '32px', height: 'auto' }} />
@@ -318,7 +259,7 @@ export default function DashboardDP3A() {
         </div>
         <nav style={{ marginTop: '1.5rem', flex: 1 }}>
           {MENU_ITEMS.map(item => (
-            <div key={item.id} className={`dp3a-nav-link${activeMenu === item.id && viewMode === 'list' ? ' active' : ''}`} onClick={() => { setActiveMenu(item.id); setViewMode('list'); fetchAll(); }}>
+            <div key={item.id} className={`dashboard-nav-link${activeMenu === item.id && viewMode === 'list' ? ' active' : ''}`} onClick={() => { setActiveMenu(item.id); setViewMode('list'); fetchAll(); }}>
               <i className={`bi ${item.icon}`}></i> {item.label}
               {item.id === 'penanganan' && allActiveList.length > 0 && <span className="badge bg-danger text-white ms-auto rounded-pill">{allActiveList.length}</span>}
             </div>
@@ -330,8 +271,8 @@ export default function DashboardDP3A() {
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="dp3a-main" style={{ flex: 1 }}>
-        <div className="dp3a-topbar">
+      <div className="dashboard-main" style={{ flex: 1 }}>
+        <div className="dashboard-topbar">
           <h5 className="fw-bold m-0 text-dark">
             {viewMode === 'detail' ? 'Detail Laporan' : MENU_ITEMS.find(m => m.id === activeMenu)?.label}
           </h5>
@@ -488,7 +429,7 @@ export default function DashboardDP3A() {
                   <div className="bento-card">
                     <h6 className="fw-bold mb-4">Aktivitas Laporan Terbaru</h6>
                     <div className="table-responsive">
-                      <table className="table dp3a-table mb-0">
+                      <table className="table dashboard-table mb-0">
                         <thead>
                           <tr>
                             <th>ID & Tanggal</th>
@@ -526,7 +467,7 @@ export default function DashboardDP3A() {
                 
                 {allActiveList.length === 0 ? <div className="text-center py-5 text-muted">Belum ada data kasus aktif.</div> : (
                   <div className="table-responsive">
-                    <table className="table dp3a-table mb-0">
+                    <table className="table dashboard-table mb-0">
                       <thead>
                         <tr>
                           <th>ID Laporan</th>
@@ -569,7 +510,7 @@ export default function DashboardDP3A() {
                 <h6 className="fw-bold mb-4">Arsip Kasus Selesai</h6>
                 {kasSels.length === 0 ? <div className="text-center py-5 text-muted">Arsip kosong</div> : (
                   <div className="table-responsive">
-                    <table className="table dp3a-table mb-0">
+                    <table className="table dashboard-table mb-0">
                       <thead>
                         <tr>
                           <th>ID Laporan</th>
@@ -700,7 +641,27 @@ export default function DashboardDP3A() {
 
                       <div>
                         <label className="small text-muted d-block mb-1">Bukti Terlampir</label>
-                        <a href="#!" className="text-primary text-decoration-none fw-semibold"><i className="bi bi-file-earmark-pdf me-1"></i> {detailData.bukti_file || 'Tidak ada file bukti'}</a>
+                        {!detailData.bukti_file ? (
+                          <span className="text-muted fst-italic">Tidak ada lampiran bukti</span>
+                        ) : (
+                          <div className="mt-2 border rounded p-2 bg-light text-center">
+                            {detailData.bukti_file.toLowerCase().match(/\.(jpeg|jpg|gif|png)$/) ? (
+                              <a href={`http://localhost:8080/${detailData.bukti_file}`} target="_blank" rel="noreferrer">
+                                <img src={`http://localhost:8080/${detailData.bukti_file}`} alt="Bukti Terlampir" className="img-fluid rounded border" style={{ maxHeight: '300px', objectFit: 'contain' }} />
+                              </a>
+                            ) : detailData.bukti_file.toLowerCase().endsWith('.pdf') ? (
+                              <div className="d-flex align-items-center justify-content-center gap-3 p-3">
+                                <i className="bi bi-file-earmark-pdf-fill text-danger" style={{ fontSize: '3rem' }}></i>
+                                <div className="text-start">
+                                  <a href={`http://localhost:8080/${detailData.bukti_file}`} target="_blank" rel="noreferrer" className="fw-bold text-primary text-decoration-none d-block fs-5">Lihat Dokumen PDF</a>
+                                  <small className="text-muted">{detailData.bukti_file.split('/').pop()}</small>
+                                </div>
+                              </div>
+                            ) : (
+                              <a href={`http://localhost:8080/${detailData.bukti_file}`} target="_blank" rel="noreferrer" className="btn btn-outline-primary fw-semibold mt-2"><i className="bi bi-file-earmark-arrow-down me-2"></i> Unduh File Lampiran</a>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -726,6 +687,54 @@ export default function DashboardDP3A() {
                   </div>
                 </div>
               </div>
+
+              {/* RIWAYAT TAHAPAN (Muncul jika Assessment / Intervensi sudah diisi) */}
+              {(detailData.hasil_assessment || detailData.metode_penanganan) && (
+                <div className="card border rounded-4 shadow-none mb-5">
+                  <div className="card-header bg-white border-bottom p-4">
+                    <h6 className="fw-bold m-0"><i className="bi bi-journal-check text-primary me-2"></i>Riwayat Pengisian Tahapan Kasus</h6>
+                  </div>
+                  <div className="card-body p-4 bg-light">
+                    <div className="row g-4">
+                      {detailData.hasil_assessment && (
+                        <div className="col-12 border-bottom pb-4">
+                          <h6 className="fw-bold text-dark mb-3 small text-uppercase"><i className="bi bi-check-circle-fill text-success me-2"></i>Tahap Assessment</h6>
+                          <div className="row g-3">
+                            <div className="col-md-6">
+                              <label className="small text-muted d-block mb-1">Hasil Wawancara / Assessment</label>
+                              <div className="bg-white p-3 border rounded-3 text-dark small">{detailData.hasil_assessment}</div>
+                            </div>
+                            <div className="col-md-3">
+                              <label className="small text-muted d-block mb-1">Kondisi Korban Saat Ini</label>
+                              <div className="bg-white p-3 border rounded-3 text-dark small">{detailData.kondisi_korban || '-'}</div>
+                            </div>
+                            <div className="col-md-3">
+                              <label className="small text-muted d-block mb-1">Kebutuhan Mendesak</label>
+                              <div className="bg-white p-3 border rounded-3 text-dark small">{detailData.kebutuhan_korban || '-'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {detailData.metode_penanganan && (
+                        <div className="col-12 pb-2">
+                          <h6 className="fw-bold text-dark mb-3 small text-uppercase"><i className="bi bi-check-circle-fill text-success me-2"></i>Tahap Rencana Intervensi</h6>
+                          <div className="row g-3">
+                            <div className="col-md-4">
+                              <label className="small text-muted d-block mb-2">Metode Penanganan Dipilih</label>
+                              <span className="badge-soft badge-soft-primary px-3 py-2 border border-primary">{detailData.metode_penanganan}</span>
+                            </div>
+                            <div className="col-md-8">
+                              <label className="small text-muted d-block mb-1">Rencana Tindakan / Layanan</label>
+                              <div className="bg-white p-3 border rounded-3 text-dark small">{detailData.rencana_tindakan || '-'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* ACTION FORM */}
               {activeAction !== 'detail' && (

@@ -7,83 +7,7 @@ const API_AUTH = 'http://localhost:8080/api/auth';
 const API_CASE = 'http://localhost:8080/api';
 const API_REPORT = 'http://localhost:8080/api';
 
-const style = `
-  :root {
-    --ungu-utama: #4f46e5;
-    --ungu-gelap: #3730a3;
-    --ungu-muda:  #eef2ff;
-    --border-sa:  #f1f5f9;
-    --bg-slate-50: #f8fafc;
-  }
-  .sa-body { background: var(--bg-slate-50); font-family: 'Segoe UI', sans-serif; color: #1e293b; }
-  .sa-sidebar { width: 260px; min-height: 100vh; background: #0f172a; position: fixed; top: 0; left: 0; z-index: 100; display: flex; flex-direction: column; }
-  .sa-sidebar .brand { padding: 2rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
-  .sa-sidebar .brand h6 { color: #fff; font-weight: 800; letter-spacing: 0.5px; margin: 0; display:flex; align-items:center; gap:10px; }
-  .sa-nav-link { color: #94a3b8; padding: 1rem 1.5rem; font-size: .9rem; font-weight: 500; display: flex; align-items: center; gap: .75rem; cursor: pointer; transition: .3s; }
-  .sa-nav-link:hover, .sa-nav-link.active { color: #fff; background: rgba(255,255,255,0.05); }
-  .sa-nav-link.active { color: #38bdf8; position: relative; }
-  .sa-nav-link.active::after { content:''; position:absolute; right:0; top:20%; bottom:20%; width:3px; background:#38bdf8; border-radius:3px 0 0 3px; }
-  
-  .sa-main { margin-left: 260px; padding: 2rem; }
-  .sa-topbar { background: transparent; padding: 0 0 2rem 0; display: flex; align-items: center; justify-content: space-between; }
-  
-  /* Bento UI Cards */
-  .bento-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
-  .bento-card { background: #fff; border-radius: 1.5rem; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -2px rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.03); transition: transform 0.3s ease; }
-  .bento-card:hover { transform: translateY(-5px); }
-  .bento-title { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px; }
-  
-  .stat-label { font-size: .85rem; color: #64748b; font-weight: 600; margin-bottom: 0.5rem; display: block; }
-  .stat-value { font-size: 2rem; font-weight: 800; color: #0f172a; line-height: 1; }
-  
-  /* Graph Placeholders */
-  .bar-chart-mini { display: flex; align-items: flex-end; gap: 8px; height: 150px; padding-top: 20px; }
-  .bar-item { flex: 1; background: var(--ungu-muda); border-radius: 6px 6px 2px 2px; transition: 0.3s; position: relative; }
-  .bar-item:hover { background: var(--ungu-utama); }
-  .bar-item:hover::after { content: attr(data-val); position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 700; }
-
-  .progress-stack { display: flex; flex-direction: column; gap: 1rem; }
-  .progress-row { display: flex; flex-direction: column; gap: 4px; }
-  .progress-info { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; }
-  .progress-bar-bg { height: 8px; background: #f1f5f9; border-radius: 10px; overflow: hidden; }
-  .progress-bar-fill { height: 100%; border-radius: 10px; transition: width 1s ease-in-out; }
-
-  .activity-item { display: flex; gap: 12px; padding-bottom: 1.25rem; border-left: 2px solid #f1f5f9; margin-left: 7px; padding-left: 1.5rem; position: relative; }
-  .activity-item::before { content:''; position:absolute; left: -6px; top: 0; width: 10px; height: 10px; border-radius: 50%; background: #cbd5e1; border: 2px solid #fff; }
-  .activity-item.active::before { background: var(--ungu-utama); }
-  .activity-content { font-size: 0.85rem; color: #475569; }
-  .activity-time { font-size: 0.75rem; color: #94a3b8; display: block; margin-top: 2px; }
-  
-  @media (max-width: 1024px) {
-    .bento-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (max-width: 768px) {
-    .sa-sidebar { display: none; }
-    .sa-main { margin-left: 0; }
-    .bento-grid { grid-template-columns: 1fr; }
-  }
-  
-  .btn-sa { background: var(--ungu-utama); color: white; border: none; }
-  .btn-sa:hover { background: var(--ungu-gelap); color: white; }
-  
-  .btn-logout:hover, .btn-logout:active, .btn-logout:focus {
-    background-color: #dc3545 !important;
-    color: white !important;
-  }
-  
-  /* Redesign Pusat Kendali Layanan */
-  .master-card { background: #fff; border-radius: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02); border: 1px solid #f3f4f6; padding: 2rem; }
-  .master-tabs { display: flex; gap: 2rem; border-bottom: 1px solid #e5e7eb; margin-bottom: 1.5rem; }
-  .master-tab { background: none; border: none; padding: 0.75rem 0; font-weight: 600; color: #6b7280; font-size: 1rem; position: relative; transition: 0.2s; cursor: pointer; }
-  .master-tab:hover { color: #111827; }
-  .master-tab.active { color: var(--ungu-utama); }
-  .master-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 3px; background: var(--ungu-utama); border-radius: 3px 3px 0 0; }
-  .master-list-item { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1rem; border-bottom: 1px solid #f3f4f6; transition: 0.2s; border-radius: 0.75rem; }
-  .master-list-item:last-child { border-bottom: none; }
-  .master-list-item:hover { background: #f8fafc; }
-  .badge-soft-success { background: #dcfce7; color: #166534; font-weight: 600; padding: 0.4rem 0.8rem; border-radius: 999px; font-size: 0.75rem; }
-  .badge-soft-secondary { background: #f3f4f6; color: #4b5563; font-weight: 600; padding: 0.4rem 0.8rem; border-radius: 999px; font-size: 0.75rem; }
-`;
+import './Dashboard.css';
 
 const MENU_ITEMS = [
   { id: 'dashboard', icon: 'bi-grid-1x2-fill', label: 'Dashboard' },
@@ -320,11 +244,10 @@ export default function DashboardSuperAdmin() {
   if (!user) return null;
 
   return (
-    <div className="sa-body" style={{ display: 'flex', minHeight: '100vh' }}>
-      <style>{style}</style>
+    <div className="dashboard-body" style={{ display: 'flex', minHeight: '100vh' }}>
 
       {/* SIDEBAR */}
-      <div className="sa-sidebar">
+      <div className="dashboard-sidebar">
         <div className="brand">
           <h6>
             <img src={logo} alt="Logo" style={{ width: '32px', height: 'auto' }} />
@@ -334,26 +257,26 @@ export default function DashboardSuperAdmin() {
         </div>
         <nav style={{ marginTop: '1rem', flex: 1 }}>
           {MENU_ITEMS.map(item => (
-            <div key={item.id} className={`sa-nav-link${activeMenu === item.id ? ' active' : ''}`} onClick={() => setActiveMenu(item.id)}>
+            <div key={item.id} className={`dashboard-nav-link${activeMenu === item.id ? ' active' : ''}`} onClick={() => setActiveMenu(item.id)}>
               <i className={`bi ${item.icon}`}></i> {item.label}
             </div>
           ))}
         </nav>
         <div style={{ padding: '1rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <button className="btn btn-sm w-100 fw-bold text-white border-secondary" onClick={handleLogout}><i className="bi bi-box-arrow-right me-2"></i>Keluar</button>
+          <button className="btn btn-sm w-100 fw-bold text-white border-secondary rounded-pill" onClick={handleLogout}><i className="bi bi-box-arrow-right me-2"></i>Keluar</button>
         </div>
       </div>
 
       {/* MAIN */}
-      <div className="sa-main" style={{ flex: 1 }}>
-        <div className="sa-topbar">
+      <div className="dashboard-main" style={{ flex: 1 }}>
+        <div className="dashboard-topbar">
           <h5 className="fw-bold m-0 text-dark">{MENU_ITEMS.find(m => m.id === activeMenu)?.label}</h5>
           <div className="dropdown">
-            <button className="btn btn-light d-flex align-items-center gap-2 border-0 bg-transparent shadow-none dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <button className="btn btn-white bg-white border d-flex align-items-center gap-2 rounded-pill shadow-sm dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
               <i className="bi bi-person-circle fs-5 text-primary"></i>
-              <span className="fw-semibold text-dark">{user.name}</span>
+              <span className="fw-bold text-dark small">{user?.name}</span>
             </button>
-            <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0" aria-labelledby="userDropdown">
+            <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-4" aria-labelledby="userDropdown">
               <li><div className="dropdown-header text-muted">Login sebagai: <br /><strong>{user.email}</strong></div></li>
               <li><hr className="dropdown-divider" /></li>
               <li>
@@ -369,71 +292,135 @@ export default function DashboardSuperAdmin() {
         {activeMenu === 'dashboard' && stats.summary && (
           <div className="bento-container">
             {/* ROW 1: Summary Metrics */}
-            <div className="bento-grid mb-4">
-              <div className="bento-card">
-                <span className="stat-label"><i className="bi bi-journal-text me-2"></i>Total Laporan</span>
-                <div className="stat-value text-primary">{stats.summary.total_kasus}</div>
+            <div className="row g-3 mb-4">
+              <div className="col-md-3">
+                <div className="bento-card mb-0 d-flex align-items-center gap-3">
+                  <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width:'48px', height:'48px', background: '#eff6ff', color: '#2563eb' }}>
+                    <i className="bi bi-file-earmark-text fs-4"></i>
+                  </div>
+                  <div>
+                    <div className="small text-muted fw-bold">Total Laporan</div>
+                    <div className="h4 m-0 fw-bold text-dark">{stats.summary.total_kasus}</div>
+                  </div>
+                </div>
               </div>
-              <div className="bento-card border-start border-4 border-danger">
-                <span className="stat-label"><i className="bi bi-hourglass-split me-2"></i>Menunggu Verifikasi</span>
-                <div className="stat-value text-danger">{stats.summary.menunggu_registrasi || 0}</div>
+              <div className="col-md-3">
+                <div className="bento-card mb-0 d-flex align-items-center gap-3">
+                  <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width:'48px', height:'48px', background: '#fef2f2', color: '#dc2626' }}>
+                    <i className="bi bi-exclamation-circle fs-4"></i>
+                  </div>
+                  <div>
+                    <div className="small text-muted fw-bold">Menunggu Verifikasi</div>
+                    <div className="h4 m-0 fw-bold text-dark">{stats.summary.menunggu_registrasi || 0}</div>
+                  </div>
+                </div>
               </div>
-              <div className="bento-card border-start border-4 border-warning">
-                <span className="stat-label"><i className="bi bi-clock-history me-2"></i>Sedang Diproses</span>
-                <div className="stat-value text-warning">{(stats.summary.proses_assessment || 0) + (stats.summary.proses_penanganan || 0)}</div>
+              <div className="col-md-3">
+                <div className="bento-card mb-0 d-flex align-items-center gap-3">
+                  <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width:'48px', height:'48px', background: '#fffbeb', color: '#d97706' }}>
+                    <i className="bi bi-briefcase fs-4"></i>
+                  </div>
+                  <div>
+                    <div className="small text-muted fw-bold">Sedang Diproses</div>
+                    <div className="h4 m-0 fw-bold text-dark">{(stats.summary.proses_assessment || 0) + (stats.summary.proses_penanganan || 0)}</div>
+                  </div>
+                </div>
               </div>
-              <div className="bento-card border-start border-4 border-success">
-                <span className="stat-label"><i className="bi bi-check-circle-fill me-2"></i>Kasus Selesai</span>
-                <div className="stat-value text-success">{stats.summary.selesai}</div>
+              <div className="col-md-3">
+                <div className="bento-card mb-0 d-flex align-items-center gap-3">
+                  <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width:'48px', height:'48px', background: '#f0fdf4', color: '#16a34a' }}>
+                    <i className="bi bi-check-circle fs-4"></i>
+                  </div>
+                  <div>
+                    <div className="small text-muted fw-bold">Kasus Selesai</div>
+                    <div className="h4 m-0 fw-bold text-dark">{stats.summary.selesai}</div>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* ROW 2: Main Analytics */}
             <div className="row g-4 mb-4">
-              <div className="col-lg-8">
-                <div className="bento-card h-100">
-                  <div className="bento-title"><i className="bi bi-graph-up text-primary"></i> Tren Pelaporan Kasus (Tahun Ini)</div>
-                  <div className="bar-chart-mini">
-                    {[35, 45, 30, 60, 85, 40, 55, 75, 50, 45, 65, 80].map((h, i) => (
-                      <div key={i} className="bar-item" style={{ height: `${h}%` }} data-val={h}></div>
-                    ))}
-                  </div>
-                  <div className="d-flex justify-content-between mt-3 text-muted small fw-bold">
-                    <span>Jan</span><span>Mar</span><span>Mei</span><span>Jul</span><span>Sep</span><span>Des</span>
-                  </div>
-                </div>
-              </div>
-              <div className="col-lg-4">
-                <div className="bento-card h-100">
-                  <div className="bento-title"><i className="bi bi-pie-chart text-info"></i> Distribusi Kategori</div>
-                  <div className="progress-stack">
-                    {(() => {
-                      const counts = {};
-                      allReports.forEach(r => {
-                        const cat = r.jenis_kekerasan || 'Lainnya';
-                        counts[cat] = (counts[cat] || 0) + 1;
-                      });
-                      const total = allReports.length || 1;
-                      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-                      const colors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#6366f1'];
+              {(() => {
+                // Bar Chart Data (Jenis Kasus)
+                const jenisKasusCounts = {};
+                allReports.forEach(d => {
+                  const k = d.jenis_kekerasan || 'Lainnya';
+                  jenisKasusCounts[k] = (jenisKasusCounts[k] || 0) + 1;
+                });
+                const jenisKasusData = Object.entries(jenisKasusCounts).sort((a,b) => b[1] - a[1]).slice(0,4);
+                const maxJenisKasus = Math.max(...jenisKasusData.map(d => d[1]), 10);
 
-                      return sorted.map(([label, count], i) => (
-                        <div key={i} className="progress-row">
-                          <div className="progress-info">
-                            <span>{label}</span>
-                            <span className="text-dark fw-bold">{Math.round((count / total) * 100)}%</span>
+                // Donut Chart Data (Demografi)
+                let anakPr = 0, anakLk = 0, dewasaPr = 0;
+                allReports.forEach(d => {
+                  const u = parseInt(d.usia_korban) || 0;
+                  const jk = (d.jenis_kelamin || '').toLowerCase();
+                  if (u < 18) {
+                    if (jk === 'perempuan') anakPr++;
+                    else anakLk++;
+                  } else {
+                    if (jk === 'perempuan') dewasaPr++;
+                  }
+                });
+                const totalDemo = anakPr + anakLk + dewasaPr || 1;
+                const donutData = [
+                  { label: 'Perempuan Dewasa', value: dewasaPr, color: '#3b82f6', percent: (dewasaPr/totalDemo)*100 },
+                  { label: 'Anak Perempuan', value: anakPr, color: '#ec4899', percent: (anakPr/totalDemo)*100 },
+                  { label: 'Anak Laki-laki', value: anakLk, color: '#f59e0b', percent: (anakLk/totalDemo)*100 },
+                ];
+                let cumulativeDash = 0;
+
+                return (
+                  <>
+                    <div className="col-lg-8">
+                      <div className="bento-card h-100">
+                        <div className="fw-bold mb-4">Tren Jenis Kasus Tahun Ini</div>
+                        <div className="bar-chart-mini position-relative">
+                          <div className="position-absolute w-100 h-100" style={{ zIndex: 0, left: 0, top: 0, pointerEvents: 'none', display: 'flex', flexDirection: 'column' }}>
+                            <div className="border-bottom border-dashed" style={{ flex: 1, opacity: 0.5 }}></div>
+                            <div className="border-bottom border-dashed" style={{ flex: 1, opacity: 0.5 }}></div>
+                            <div className="border-bottom border-dashed" style={{ flex: 1, opacity: 0.5 }}></div>
                           </div>
-                          <div className="progress-bar-bg">
-                            <div className="progress-bar-fill" style={{ width: `${(count / total) * 100}%`, background: colors[i % colors.length] }}></div>
-                          </div>
-                          <small className="text-muted" style={{ fontSize: '0.7rem' }}>{count} Kasus</small>
+                          {jenisKasusData.map(([label, val], idx) => (
+                            <div key={idx} className="bar-item-wrapper">
+                              <div className="bar-item" style={{ height: `${(val/maxJenisKasus)*100}%` }} data-val={val}></div>
+                              <div className="bar-label">{label}</div>
+                            </div>
+                          ))}
                         </div>
-                      ));
-                    })()}
-                    {allReports.length === 0 && <div className="text-center py-4 text-muted small">Belum ada data distribusi</div>}
-                  </div>
-                </div>
-              </div>
+                      </div>
+                    </div>
+                    <div className="col-lg-4">
+                      <div className="bento-card h-100">
+                        <div className="fw-bold mb-4">Demografi Korban</div>
+                        <div className="donut-chart-container">
+                          <svg className="donut-svg" viewBox="0 0 160 160">
+                            <circle cx="80" cy="80" r="65" fill="transparent" stroke="#f1f5f9" strokeWidth="20" />
+                            {donutData.map((d, i) => {
+                              const dashLength = (d.percent / 100) * 408.4;
+                              const offset = -cumulativeDash;
+                              cumulativeDash += dashLength;
+                              if (d.value === 0) return null;
+                              return (
+                                <circle key={i} cx="80" cy="80" r="65" fill="transparent" stroke={d.color} strokeWidth="20" strokeDasharray={`${dashLength} 408.4`} strokeDashoffset={offset} style={{ transition: '0.3s' }} />
+                              );
+                            })}
+                          </svg>
+                          <div className="donut-legend">
+                            {donutData.map((d, i) => (
+                              <div key={i} className="legend-item">
+                                <div><span className="legend-color" style={{ backgroundColor: d.color }}></span> <span className="text-muted">{d.label}</span></div>
+                                <div className="fw-bold">{d.value}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* ROW 3: Tracking & Kinerja */}
@@ -628,7 +615,7 @@ export default function DashboardSuperAdmin() {
 
             {/* Tabel */}
             <div className="table-responsive">
-              <table className="table sa-table mb-0">
+              <table className="table dashboard-table mb-0">
                 <thead>
                   <tr>
                     <th>Kode</th>
