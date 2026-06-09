@@ -21,7 +21,12 @@ export default function LoginPage() {
       const token = localStorage.getItem('sipeka_token');
       if (userRaw && token && userRaw !== 'undefined') {
         const user = JSON.parse(userRaw);
-        redirectBasedOnRole(user.role);
+        if (user.role === 'super_admin' || user.role === 'petugas_uptd') {
+          redirectBasedOnRole(user.role);
+        } else {
+          localStorage.removeItem('sipeka_user');
+          localStorage.removeItem('sipeka_token');
+        }
       }
     } catch(e) {
       localStorage.removeItem('sipeka_user');
@@ -32,8 +37,12 @@ export default function LoginPage() {
   const redirectBasedOnRole = (role) => {
     if (role === 'super_admin') {
       navigate('/superadmin', { replace: true });
-    } else {
+    } else if (role === 'petugas_uptd') {
       navigate('/dashboard-dp3a', { replace: true });
+    } else {
+      localStorage.removeItem('sipeka_token');
+      localStorage.removeItem('sipeka_user');
+      setErrorMsg('Role akun tidak valid atau sesi kadaluarsa.');
     }
   };
 
