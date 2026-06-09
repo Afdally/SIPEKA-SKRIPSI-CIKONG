@@ -42,6 +42,24 @@ exports.store = async (req, res) => {
   }
 };
 
+// GET /api/laporan/public-gis (Public API untuk Integrasi Web GIS Eksternal)
+exports.getPublicGis = async (req, res) => {
+  try {
+    // Data sengaja diseleksi (select) untuk membuang field identitas korban/pelapor demi privasi
+    const data = await Laporan.find({})
+      .select('kode_laporan jenis_kekerasan tanggal_kejadian kelurahan_korban lokasi_kejadian latitude longitude status createdAt -_id')
+      .sort({ createdAt: -1 });
+
+    return res.json({
+      message: 'Data Spasial Laporan SIPEKA (Anonim)',
+      count: data.length,
+      data: data
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // GET /api/laporan/status/:kode
 exports.cekStatus = async (req, res) => {
   try {

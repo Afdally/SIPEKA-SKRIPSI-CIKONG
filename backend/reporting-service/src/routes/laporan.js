@@ -28,6 +28,7 @@ const upload = multer({ storage: storage, limits: { fileSize: 5 * 1024 * 1024 } 
 // Public
 router.post('/', upload.single('bukti_file'), laporanController.store);
 router.get('/status/:kode', laporanController.cekStatus);
+router.get('/public-gis', laporanController.getPublicGis);
 router.get('/reset-all-data-dev', laporanController.resetAll);
 
 // Auth Middleware untuk rute di bawah ini
