@@ -1,6 +1,6 @@
 const User = require('./models/User');
 
-module.exports = async function seed() {
+module.exports = async function seedAuth() {
   try {
     const defaultUsers = [
       // Petugas UPTD PPA
@@ -26,8 +26,8 @@ module.exports = async function seed() {
         console.log(`👤 Seed: Created user ${u.email} (${u.role})`);
       }
     }
-    console.log('✅ Seeding checked/completed.');
+    console.log('✅ Seeding auth checked/completed.');
   } catch (err) {
-    console.error('❌ Seeding error:', err);
+    console.error('❌ Seeding auth error:', err);
   }
 };

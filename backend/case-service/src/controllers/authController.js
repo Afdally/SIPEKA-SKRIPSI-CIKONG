@@ -156,7 +156,7 @@ exports.updateUser = async (req, res) => {
   try {
     const { name, email, role, password } = req.body;
     const user = await User.findById(req.params.id);
-    
+
     if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
 
     if (name) user.name = name;

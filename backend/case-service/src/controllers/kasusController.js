@@ -1,7 +1,5 @@
-const axios = require('axios');
 const Kasus = require('../models/Kasus');
-
-const REPORT_URL = process.env.REPORT_SERVICE_URL || 'http://localhost:8001';
+const { publishStatusUpdate } = require('../queue/publisher');
 
 // ─── GET /api/penanganan — Daftar semua kasus ───
 exports.index = async (req, res) => {
@@ -53,18 +51,15 @@ exports.registrasi = async (req, res) => {
       status:              'registrasi',
     });
 
-    // Update status laporan di report-service → proses_assessment
+    // Publish perubahan status ke RabbitMQ → report-service konsumsi & update Laporan.status
     try {
-      await axios.patch(
-        `${REPORT_URL}/api/laporan/${laporan_id}/status`,
-        {
-          status:  'proses_assessment',
-          catatan: pesan_tindak_lanjut,
-        },
-        { headers: { Authorization: `Bearer ${req.raw_token}` } }
-      );
-    } catch (httpErr) {
-      console.error('Gagal update status laporan:', httpErr.message);
+      await publishStatusUpdate({
+        laporan_id,
+        status:  'proses_assessment',
+        catatan: pesan_tindak_lanjut,
+      });
+    } catch (queueErr) {
+      console.error('Gagal publish status laporan ke queue:', queueErr.message);
     }
 
     return res.status(201).json({
@@ -128,18 +123,15 @@ exports.intervensi = async (req, res) => {
 
     if (!kasus) return res.status(404).json({ message: 'Kasus tidak ditemukan' });
 
-    // Update status laporan → dalam_penanganan
+    // Publish perubahan status ke RabbitMQ → report-service konsumsi & update Laporan.status
     try {
-      await axios.patch(
-        `${REPORT_URL}/api/laporan/${kasus.laporan_id}/status`,
-        {
-          status:  'dalam_penanganan',
-          catatan: `Dalam penanganan: ${metode_penanganan}`,
-        },
-        { headers: { Authorization: `Bearer ${req.raw_token}` } }
-      );
-    } catch (httpErr) {
-      console.error('Gagal update status laporan:', httpErr.message);
+      await publishStatusUpdate({
+        laporan_id: kasus.laporan_id,
+        status:     'dalam_penanganan',
+        catatan:    `Dalam penanganan: ${metode_penanganan}`,
+      });
+    } catch (queueErr) {
+      console.error('Gagal publish status laporan ke queue:', queueErr.message);
     }
 
     return res.json({ message: 'Rencana intervensi berhasil disimpan', kasus });
@@ -190,18 +182,15 @@ exports.selesaikan = async (req, res) => {
 
     if (!kasus) return res.status(404).json({ message: 'Kasus tidak ditemukan' });
 
-    // Update status laporan → selesai
+    // Publish perubahan status ke RabbitMQ → report-service konsumsi & update Laporan.status
     try {
-      await axios.patch(
-        `${REPORT_URL}/api/laporan/${kasus.laporan_id}/status`,
-        {
-          status:  'selesai',
-          catatan: `Kasus selesai ditangani (${kasus.metode_penanganan || 'N/A'})`,
-        },
-        { headers: { Authorization: `Bearer ${req.raw_token}` } }
-      );
-    } catch (httpErr) {
-      console.error('Gagal update status laporan:', httpErr.message);
+      await publishStatusUpdate({
+        laporan_id: kasus.laporan_id,
+        status:     'selesai',
+        catatan:    `Kasus selesai ditangani (${kasus.metode_penanganan || 'N/A'})`,
+      });
+    } catch (queueErr) {
+      console.error('Gagal publish status laporan ke queue:', queueErr.message);
     }
 
     return res.json({ message: 'Kasus berhasil diselesaikan dan diarsipkan', kasus });

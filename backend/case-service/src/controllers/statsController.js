@@ -1,5 +1,4 @@
 const Kasus = require('../models/Kasus');
-const axios = require('axios');
 
 // GET /api/penanganan/stats/summary
 exports.getSummary = async (req, res) => {

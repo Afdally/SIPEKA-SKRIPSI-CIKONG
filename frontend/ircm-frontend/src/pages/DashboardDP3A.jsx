@@ -40,6 +40,7 @@ export default function DashboardDP3A() {
   // Detail View State
   const [selectedItem, setSelectedItem] = useState(null);
   const [activeAction, setActiveAction] = useState('detail');
+  const [filterKategori, setFilterKategori] = useState('');
 
   // Form states
   const [pesanTindakLanjut, setPesanTindakLanjut] = useState('');
@@ -180,7 +181,8 @@ export default function DashboardDP3A() {
       tgl_melapor: r.createdAt,
       nama_pelapor: r.nama_pelapor,
       anonim: r.anonim,
-      jenis_kekerasan: r.jenis_kekerasan
+      jenis_kekerasan: r.jenis_kekerasan,
+      tipe_laporan: r.tipe_laporan
     };
   };
 
@@ -200,6 +202,10 @@ export default function DashboardDP3A() {
   ].sort((a,b) => new Date(b.createdAt || b.tanggal_registrasi) - new Date(a.createdAt || a.tanggal_registrasi));
 
   const kasSels = kasusList.filter(k => k.status === 'selesai').map(enrichKasus);
+
+  // Terapkan filter kategori (Anak/Perempuan) khusus untuk tampilan tabel
+  const filteredActiveList = filterKategori ? allActiveList.filter(item => item.tipe_laporan === filterKategori) : allActiveList;
+  const filteredKasSels = filterKategori ? kasSels.filter(k => k.tipe_laporan === filterKategori) : kasSels;
 
   // Detail Data Logic
   let detailData = null;
@@ -462,10 +468,17 @@ export default function DashboardDP3A() {
               <div className="bento-card">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                   <h6 className="fw-bold m-0">Daftar Kasus Menunggu Penanganan</h6>
-                  <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-2">{allActiveList.length} Data</span>
+                  <div className="d-flex align-items-center gap-3">
+                    <select className="form-select form-select-sm" style={{ width: '160px' }} value={filterKategori} onChange={e => setFilterKategori(e.target.value)}>
+                      <option value="">Semua Kategori</option>
+                      <option value="anak">Anak</option>
+                      <option value="perempuan">Perempuan</option>
+                    </select>
+                    <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-2">{filteredActiveList.length} Data</span>
+                  </div>
                 </div>
-                
-                {allActiveList.length === 0 ? <div className="text-center py-5 text-muted">Belum ada data kasus aktif.</div> : (
+
+                {filteredActiveList.length === 0 ? <div className="text-center py-5 text-muted">Belum ada data kasus aktif.</div> : (
                   <div className="table-responsive">
                     <table className="table dashboard-table mb-0">
                       <thead>
@@ -473,12 +486,13 @@ export default function DashboardDP3A() {
                           <th>ID Laporan</th>
                           <th>Pelapor (Inisial)</th>
                           <th>Korban (Inisial)</th>
+                          <th>Kategori</th>
                           <th>Tahap Saat Ini</th>
                           <th>Aksi</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {allActiveList.map(item => (
+                        {filteredActiveList.map(item => (
                           <tr key={item.id || item._id}>
                             <td>
                               <div className="fw-bold text-dark">{item.kode_laporan}</div>
@@ -486,6 +500,11 @@ export default function DashboardDP3A() {
                             </td>
                             <td><span className="fw-semibold">{getInitials(item.nama_pelapor || (item.anonim ? 'Anonim' : '-'))}</span></td>
                             <td><span className="fw-semibold">{getInitials(item.nama_korban)}</span> <span className="small text-muted">({item.jenis_kelamin?.charAt(0)})</span></td>
+                            <td>
+                              <span className={`badge ${item.tipe_laporan === 'anak' ? 'bg-warning text-dark' : 'bg-info text-dark'}`}>
+                                {item.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan'}
+                              </span>
+                            </td>
                             <td>
                               <span className="badge-soft badge-soft-primary">
                                 {item.listStatus}
@@ -507,8 +526,15 @@ export default function DashboardDP3A() {
 
             {activeMenu === 'arsip' && (
               <div className="bento-card">
-                <h6 className="fw-bold mb-4">Arsip Kasus Selesai</h6>
-                {kasSels.length === 0 ? <div className="text-center py-5 text-muted">Arsip kosong</div> : (
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                  <h6 className="fw-bold m-0">Arsip Kasus Selesai</h6>
+                  <select className="form-select form-select-sm" style={{ width: '160px' }} value={filterKategori} onChange={e => setFilterKategori(e.target.value)}>
+                    <option value="">Semua Kategori</option>
+                    <option value="anak">Anak</option>
+                    <option value="perempuan">Perempuan</option>
+                  </select>
+                </div>
+                {filteredKasSels.length === 0 ? <div className="text-center py-5 text-muted">Arsip kosong</div> : (
                   <div className="table-responsive">
                     <table className="table dashboard-table mb-0">
                       <thead>
@@ -516,17 +542,23 @@ export default function DashboardDP3A() {
                           <th>ID Laporan</th>
                           <th>Tgl Selesai</th>
                           <th>Korban</th>
+                          <th>Kategori</th>
                           <th>Metode Penanganan</th>
                           <th>Aksi</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {kasSels.map(k => (
+                        {filteredKasSels.map(k => (
                           <tr key={k._id}>
                             <td><div className="fw-bold text-dark">{k.kode_laporan}</div></td>
                             <td className="small text-muted fw-semibold">{new Date(k.tanggal_selesai).toLocaleDateString('id-ID')}</td>
                             <td>
                               <div className="fw-bold">{getInitials(k.nama_korban)}</div>
+                            </td>
+                            <td>
+                              <span className={`badge ${k.tipe_laporan === 'anak' ? 'bg-warning text-dark' : 'bg-info text-dark'}`}>
+                                {k.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan'}
+                              </span>
                             </td>
                             <td><span className="fw-semibold small">{k.metode_penanganan}</span></td>
                             <td>

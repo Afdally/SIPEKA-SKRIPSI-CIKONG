@@ -15,26 +15,24 @@ services:
       - ircm-network
 
   # ============================================
-  # BACKEND CONTAINERS (3 Express Services)
+  # MESSAGE BROKER (RabbitMQ)
   # ============================================
 
-  auth-service:
-    build:
-      context: ./backend/auth-service
-      dockerfile: Dockerfile
-    container_name: ircm-auth-service
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ircm-rabbitmq
     restart: unless-stopped
-    environment:
-      MONGODB_URI: mongodb://mongodb:27017/auth_db
-      JWT_SECRET: ircm_secret_key
-      JWT_TTL: 3600
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     volumes:
-      - ./backend/auth-service:/usr/src/app
-      - /usr/src/app/node_modules
-    depends_on:
-      - mongodb
+      - rabbitmq-data:/var/lib/rabbitmq
     networks:
       - ircm-network
+
+  # ============================================
+  # BACKEND CONTAINERS (2 Express Services)
+  # ============================================
 
   report-service:
     build:
@@ -45,13 +43,14 @@ services:
     environment:
       MONGODB_URI: mongodb://mongodb:27017/report_db
       JWT_SECRET: ircm_secret_key
+      RABBITMQ_URL: amqp://rabbitmq:5672
       PORT: 8000
     volumes:
       - ./backend/reporting-service:/usr/src/app
       - /usr/src/app/node_modules
     depends_on:
       - mongodb
-      - auth-service
+      - rabbitmq
     networks:
       - ircm-network
 
@@ -64,14 +63,15 @@ services:
     environment:
       MONGODB_URI: mongodb://mongodb:27017/case_db
       JWT_SECRET: ircm_secret_key
+      JWT_TTL: 3600
+      RABBITMQ_URL: amqp://rabbitmq:5672
       PORT: 8000
-      REPORT_SERVICE_URL: http://report-service:8000
     volumes:
       - ./backend/case-service:/usr/src/app
       - /usr/src/app/node_modules
     depends_on:
       - mongodb
-      - auth-service
+      - rabbitmq
     networks:
       - ircm-network
 
@@ -88,7 +88,6 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - auth-service
       - report-service
       - case-service
     networks:
@@ -110,7 +109,6 @@ services:
       - ./frontend/ircm-frontend:/app
       - /app/node_modules
     depends_on:
-      - auth-service
       - report-service
       - case-service
     networks:
@@ -122,3 +120,4 @@ networks:
 
 volumes:
   mongodb-data:
+  rabbitmq-data:

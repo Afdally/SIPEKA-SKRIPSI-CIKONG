@@ -26,6 +26,7 @@ export default function DashboardSuperAdmin() {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterRegion, setFilterRegion] = useState('');
+  const [filterKategori, setFilterKategori] = useState('');
 
   // Data States
   const [stats, setStats] = useState({ summary: null, kinerja: [] });
@@ -205,6 +206,8 @@ export default function DashboardSuperAdmin() {
       }
       // Filter Wilayah
       if (filterRegion && r.kelurahan_korban !== filterRegion) return false;
+      // Filter Kategori (Anak / Perempuan)
+      if (filterKategori && r.tipe_laporan !== filterKategori) return false;
       return true;
     });
   };
@@ -213,7 +216,7 @@ export default function DashboardSuperAdmin() {
     const data = getFilteredReports();
     if (data.length === 0) return alert('Tidak ada data untuk diekspor!');
 
-    let csv = 'Kode Laporan,Tanggal Kejadian,Nama Korban,Usia,Jenis Kelamin,Wilayah,Jenis Kekerasan,Status,Kronologi\n';
+    let csv = 'Kode Laporan,Tanggal Kejadian,Nama Korban,Usia,Jenis Kelamin,Wilayah,Jenis Kekerasan,Kategori,Status,Kronologi\n';
 
     data.forEach(r => {
       const escapeCSV = (str) => {
@@ -227,8 +230,9 @@ export default function DashboardSuperAdmin() {
 
       const d = new Date(r.tanggal_kejadian);
       const tgl = isNaN(d.getTime()) ? '-' : (r.tanggal_kejadian_format || d.toLocaleDateString('id-ID'));
+      const kategori = r.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan';
 
-      csv += `${escapeCSV(r.kode_laporan)},${escapeCSV(tgl)},${escapeCSV(r.nama_korban)},${escapeCSV(r.usia_korban)},${escapeCSV(r.jenis_kelamin)},${escapeCSV(r.kelurahan_korban)},${escapeCSV(r.jenis_kekerasan)},${escapeCSV(r.status)},${escapeCSV(r.kronologi)}\n`;
+      csv += `${escapeCSV(r.kode_laporan)},${escapeCSV(tgl)},${escapeCSV(r.nama_korban)},${escapeCSV(r.usia_korban)},${escapeCSV(r.jenis_kelamin)},${escapeCSV(r.kelurahan_korban)},${escapeCSV(r.jenis_kekerasan)},${escapeCSV(kategori)},${escapeCSV(r.status)},${escapeCSV(r.kronologi)}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -589,11 +593,11 @@ export default function DashboardSuperAdmin() {
 
             {/* Filter Section */}
             <div className="row g-3 mb-4 p-3 bg-light rounded-3" style={{ border: '1px solid #e5e7eb' }}>
-              <div className="col-md-3">
+              <div className="col-md-2">
                 <label className="form-label small fw-bold">Dari Tanggal</label>
                 <input type="date" className="form-control" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
               </div>
-              <div className="col-md-3">
+              <div className="col-md-2">
                 <label className="form-label small fw-bold">Sampai Tanggal</label>
                 <input type="date" className="form-control" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
               </div>
@@ -606,8 +610,16 @@ export default function DashboardSuperAdmin() {
                   ))}
                 </select>
               </div>
-              <div className="col-md-3 d-flex align-items-end">
-                <button className="btn btn-outline-secondary w-100" onClick={() => { setFilterStartDate(''); setFilterEndDate(''); setFilterRegion(''); }}>
+              <div className="col-md-3">
+                <label className="form-label small fw-bold">Kategori</label>
+                <select className="form-select" value={filterKategori} onChange={e => setFilterKategori(e.target.value)}>
+                  <option value="">Semua Kategori</option>
+                  <option value="anak">Anak</option>
+                  <option value="perempuan">Perempuan</option>
+                </select>
+              </div>
+              <div className="col-md-2 d-flex align-items-end">
+                <button className="btn btn-outline-secondary w-100" onClick={() => { setFilterStartDate(''); setFilterEndDate(''); setFilterRegion(''); setFilterKategori(''); }}>
                   Reset Filter
                 </button>
               </div>
@@ -623,6 +635,7 @@ export default function DashboardSuperAdmin() {
                     <th>Nama Korban</th>
                     <th>Wilayah</th>
                     <th>Kekerasan</th>
+                    <th>Kategori</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -640,6 +653,11 @@ export default function DashboardSuperAdmin() {
                       <td>{r.kelurahan_korban}</td>
                       <td>{r.jenis_kekerasan}</td>
                       <td>
+                        <span className={`badge ${r.tipe_laporan === 'anak' ? 'bg-warning text-dark' : 'bg-info text-dark'}`}>
+                          {r.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan'}
+                        </span>
+                      </td>
+                      <td>
                         <span className={`badge ${r.status === 'selesai' ? 'bg-success' : r.status === 'menunggu_registrasi' ? 'bg-danger' : 'bg-warning'} text-white`}>
                           {r.status.replace('_', ' ').toUpperCase()}
                         </span>
@@ -648,7 +666,7 @@ export default function DashboardSuperAdmin() {
                   ))}
                   {getFilteredReports().length === 0 && (
                     <tr>
-                      <td colSpan="6" className="text-center py-5 text-muted">
+                      <td colSpan="7" className="text-center py-5 text-muted">
                         <i className="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>
                         Tidak ada data laporan yang sesuai filter.
                       </td>

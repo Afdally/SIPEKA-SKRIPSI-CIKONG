@@ -7,6 +7,7 @@ require('dotenv').config();
 const laporanRoutes = require('./src/routes/laporan');
 const masterRoutes = require('./src/routes/master');
 const { seedKekerasan } = require('./src/controllers/masterKekerasanController');
+const { startConsumer } = require('./src/queue/consumer');
 
 const app = express();
 
@@ -26,6 +27,7 @@ mongoose.connect(MONGODB_URI)
   .then(async () => {
     console.log('✅ MongoDB terhubung:', MONGODB_URI);
     await seedKekerasan(); // Auto-seeding master data
+    startConsumer(); // Mulai konsumsi event status kasus dari RabbitMQ
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Reporting Service berjalan di http://0.0.0.0:${PORT}`);
     });
