@@ -134,13 +134,18 @@ Microservices". Judul baru hasil revisi (Bahasa Indonesia penuh):
   Proposal perlu disesuaikan agar tidak lagi menyebut verifikasi sebagai modul/service
   tersendiri — "verifikasi" di alur kerja sekarang adalah tahap `assessment` di dalam
   `case-service`.
-- **GIS SUDAH ada endpoint-nya di `reporting-service`**, bertentangan dengan asumsi awal
-  bahwa GIS 100% di luar scope: `getPublicGis` (data spasial teranonimkan — identitas
-  korban/pelapor dibuang, publik) dan `getGisMap` (data lengkap, khusus role
-  `super_admin`) di `laporanController.js`. Ada juga `test-gis.html` di root repo — demo
-  Leaflet.js yang konsumsi endpoint `public-gis`, judulnya "Peta Kerawanan SIPEKA".
-  **Belum dikonfirmasi ke user**: apakah ini dibangun sendiri sebagai eksperimen, atau
-  memang titik integrasi resmi untuk sistem GIS milik rekan satu tim.
+- **KLARIFIKASI FINAL soal GIS (2026-07-22):** `test-gis.html` di root repo BUKAN produk
+  GIS milik thesis ini — itu cuma alat uji coba milik user sendiri untuk memverifikasi
+  bahwa endpoint `/api/laporan/public-gis` menghasilkan data yang valid dan bisa dipakai.
+  **Sistem GIS/pemetaan yang sesungguhnya adalah skripsi terpisah milik rekan satu tim**
+  ("pemetaan pelaporan"), yang datanya ditarik dari `reporting-service` milik thesis ini
+  lewat endpoint `getPublicGis`/`getGisMap` di `laporanController.js`.
+  **PENTING — JANGAN klaim visualisasi/pemetaan spasial sebagai kontribusi/novelty thesis
+  ini** — itu salah atribusi, berpotensi jadi masalah tumpang tindih klaim dengan skripsi
+  rekan. Kontribusi thesis ini dari sisi ini HANYA sebatas: menyediakan endpoint data
+  spasial yang sudah dianonimkan (privacy-by-design, identitas korban/pelapor dibuang)
+  sebagai titik integrasi untuk sistem lain — ini boleh disebut sebagai detail teknis
+  pendukung, BUKAN pilar judul/novelty utama.
 
 ## Status Implementasi Kode/Website (per 2026-07-22)
 
@@ -162,8 +167,9 @@ Microservices". Judul baru hasil revisi (Bahasa Indonesia penuh):
    Management" tanpa padanan Indonesia, selaraskan dengan judul baru.
 7. ⬜ Pastikan alur status laporan di UI (pelaporan → registrasi → assessment → dalam
    penanganan → selesai/arsip) konsisten dengan flowchart BAB III proposal.
-8. ⬜ Klarifikasi status endpoint GIS (`public-gis`, `gis-map`, `test-gis.html`) — apakah
-   masuk kontribusi resmi thesis ini atau murni titik integrasi untuk thesis rekan.
+8. ✅ Status endpoint GIS sudah diklarifikasi user: `public-gis`/`gis-map` murni titik
+   integrasi data untuk skripsi GIS milik rekan satu tim, BUKAN kontribusi thesis ini.
+   Jangan ditulis sebagai novelty di proposal/BAB IV-V.
 
 ## Yang Masih Ditunda (menunggu data lapangan)
 
