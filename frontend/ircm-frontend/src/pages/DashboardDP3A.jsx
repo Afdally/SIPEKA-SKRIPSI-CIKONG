@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import logo from '../assets/logo.png';
-
-const API_REPORT = 'http://localhost:8080/api';
-const API_CASE = 'http://localhost:8080/api';
-
+import laporanService from '../services/laporanService';
+import kasusService from '../services/kasusService';
+import StatCard from '../components/dashboard/StatCard';
+import JenisKasusChart from '../components/dashboard/JenisKasusChart';
+import DemografiChart from '../components/dashboard/DemografiChart';
 import './Dashboard.css';
 
 const METODE_LIST = ['Konsultasi / Mediasi', 'Psikososial', 'Bantuan Hukum'];
@@ -27,22 +27,25 @@ const STEP_STAGES = [
 
 export default function DashboardDP3A() {
   const navigate = useNavigate();
+
+  // ==================== STATE ====================
+
   const [user, setUser] = useState(null);
   const [activeMenu, setActiveMenu] = useState('penanganan');
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'detail'
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Data
+  // Data mentah dari backend: laporan (report-service) & kasus (case-service)
   const [reports, setReports] = useState([]);
   const [kasusList, setKasusList] = useState([]);
 
-  // Detail View State
+  // State untuk mode detail/proses satu laporan/kasus
   const [selectedItem, setSelectedItem] = useState(null);
   const [activeAction, setActiveAction] = useState('detail');
   const [filterKategori, setFilterKategori] = useState('');
 
-  // Form states
+  // State form tiap tahap penanganan
   const [pesanTindakLanjut, setPesanTindakLanjut] = useState('');
   const [hasilAssessment, setHasilAssessment] = useState('');
   const [kondisiKorban, setKondisiKorban] = useState('');
@@ -53,15 +56,17 @@ export default function DashboardDP3A() {
 
   const getToken = () => localStorage.getItem('sipeka_token');
 
+  // ==================== DATA FETCHING ====================
+
   const fetchAll = useCallback(async (tok) => {
     setLoading(true);
     try {
-      const [resRep, resKas] = await Promise.all([
-        axios.get(`${API_REPORT}/laporan`, { headers: { Authorization: `Bearer ${tok || getToken()}` } }),
-        axios.get(`${API_CASE}/penanganan`, { headers: { Authorization: `Bearer ${tok || getToken()}` } })
+      const [reportsData, kasusData] = await Promise.all([
+        laporanService.getAll(tok || getToken()),
+        kasusService.getAll(tok || getToken()),
       ]);
-      setReports(resRep.data.data || []);
-      setKasusList(resKas.data || []);
+      setReports(reportsData || []);
+      setKasusList(kasusData || []);
     } catch (err) {
       console.error(err);
       if (err.response?.status === 401) {
@@ -87,16 +92,18 @@ export default function DashboardDP3A() {
     navigate('/login');
   };
 
-  // ACTIONS
+  // ==================== ACTIONS: ALUR PENANGANAN KASUS ====================
+  // Tahap 1 (registrasi) -> 2 (assessment) -> 3 (intervensi) -> 4 (monitoring/selesai)
+
   const submitRegistrasi = async () => {
     if (!pesanTindakLanjut) return alert('Pesan tindak lanjut wajib diisi');
     setSubmitting(true);
     try {
-      await axios.post(`${API_CASE}/penanganan/registrasi`, {
+      await kasusService.registrasi(getToken(), {
         laporan_id: selectedItem._id || selectedItem.id,
         kode_laporan: selectedItem.kode_laporan,
         pesan_tindak_lanjut: pesanTindakLanjut
-      }, { headers: { Authorization: `Bearer ${getToken()}` } });
+      });
       setViewMode('list');
       fetchAll();
     } catch (err) {
@@ -110,11 +117,11 @@ export default function DashboardDP3A() {
     if (!hasilAssessment) return alert('Hasil assessment wajib diisi');
     setSubmitting(true);
     try {
-      await axios.put(`${API_CASE}/penanganan/${selectedItem._id}/assessment`, {
+      await kasusService.assessment(getToken(), selectedItem._id, {
         hasil_assessment: hasilAssessment,
         kondisi_korban: kondisiKorban,
         kebutuhan_korban: kebutuhanKorban
-      }, { headers: { Authorization: `Bearer ${getToken()}` } });
+      });
       setViewMode('list');
       fetchAll();
     } catch (err) {
@@ -128,10 +135,10 @@ export default function DashboardDP3A() {
     if (!metode) return alert('Metode wajib dipilih');
     setSubmitting(true);
     try {
-      await axios.put(`${API_CASE}/penanganan/${selectedItem._id}/intervensi`, {
+      await kasusService.intervensi(getToken(), selectedItem._id, {
         metode_penanganan: metode,
         rencana_tindakan: rencana
-      }, { headers: { Authorization: `Bearer ${getToken()}` } });
+      });
       setViewMode('list');
       fetchAll();
     } catch (err) {
@@ -145,9 +152,7 @@ export default function DashboardDP3A() {
     if (!catatanLog) return alert('Catatan log wajib diisi');
     setSubmitting(true);
     try {
-      await axios.post(`${API_CASE}/penanganan/${selectedItem._id}/log`, {
-        catatan: catatanLog
-      }, { headers: { Authorization: `Bearer ${getToken()}` } });
+      await kasusService.addLog(getToken(), selectedItem._id, { catatan: catatanLog });
       setViewMode('list');
       fetchAll();
     } catch (err) {
@@ -160,7 +165,7 @@ export default function DashboardDP3A() {
   const selesaikanKasus = async () => {
     if (!window.confirm('Yakin ingin menutup kasus ini? Kasus akan diarsipkan dan tidak bisa diubah lagi.')) return;
     try {
-      await axios.put(`${API_CASE}/penanganan/${selectedItem._id}/selesai`, {}, { headers: { Authorization: `Bearer ${getToken()}` } });
+      await kasusService.selesaikan(getToken(), selectedItem._id);
       setViewMode('list');
       fetchAll();
     } catch (err) {
@@ -170,6 +175,11 @@ export default function DashboardDP3A() {
 
   if (!user) return null;
 
+  // ==================== DERIVED DATA ====================
+  // Data mentah (reports, kasusList) digabung/difilter di sini untuk keperluan tampilan.
+  // Tidak ada state terpisah supaya selalu konsisten dengan data terbaru dari fetchAll().
+
+  // Laporan report-service tidak menyimpan detail korban, jadi ditempel dari data laporan aslinya.
   const enrichKasus = (k) => {
     const r = reports.find(rep => rep.kode_laporan === k.kode_laporan) || {};
     return {
@@ -186,11 +196,10 @@ export default function DashboardDP3A() {
     };
   };
 
-  // Combine reports and cases for the "Penanganan Kasus" active list
   const lapBaru = reports.filter(r => r.status === 'menunggu_registrasi');
   const kasAktif = kasusList.filter(k => k.status !== 'selesai').map(enrichKasus);
-  
-  // Array of all active items to process
+
+  // Gabungan laporan yang belum diregistrasi + kasus yang masih aktif, untuk tab "Penanganan Kasus"
   const allActiveList = [
     ...lapBaru.map(r => ({ ...r, listType: 'laporan', listStatus: 'Registrasi' })),
     ...kasAktif.map(k => {
@@ -199,15 +208,15 @@ export default function DashboardDP3A() {
       else if (k.status === 'assessment') st = 'Rencana Intervensi';
       return { ...k, listType: 'kasus', listStatus: st };
     })
-  ].sort((a,b) => new Date(b.createdAt || b.tanggal_registrasi) - new Date(a.createdAt || a.tanggal_registrasi));
+  ].sort((a, b) => new Date(b.createdAt || b.tanggal_registrasi) - new Date(a.createdAt || a.tanggal_registrasi));
 
   const kasSels = kasusList.filter(k => k.status === 'selesai').map(enrichKasus);
 
-  // Terapkan filter kategori (Anak/Perempuan) khusus untuk tampilan tabel
+  // Filter kategori (Anak/Perempuan) khusus untuk tampilan tabel, tidak mengubah data asli
   const filteredActiveList = filterKategori ? allActiveList.filter(item => item.tipe_laporan === filterKategori) : allActiveList;
   const filteredKasSels = filterKategori ? kasSels.filter(k => k.tipe_laporan === filterKategori) : kasSels;
 
-  // Detail Data Logic
+  // Data lengkap untuk detail satu laporan/kasus yang lagi dibuka
   let detailData = null;
   if (selectedItem) {
     const reportMatch = reports.find(r => r.kode_laporan === selectedItem.kode_laporan) || {};
@@ -215,10 +224,10 @@ export default function DashboardDP3A() {
     detailData = { ...reportMatch, ...caseMatch, ...selectedItem };
   }
 
+  // Klik "Proses" -> tentukan form tahap berikutnya berdasarkan status kasus saat ini
   const handleProses = (item) => {
     setSelectedItem(item);
-    
-    // Determine action from status
+
     if (item.listType === 'laporan' || item.status === 'menunggu_registrasi') {
       setActiveAction('registrasi');
       setPesanTindakLanjut('');
@@ -234,22 +243,25 @@ export default function DashboardDP3A() {
     } else {
       setActiveAction('detail');
     }
-    
+
     setViewMode('detail');
   };
 
-  // Format Helper
+  // ==================== HELPERS ====================
+
   const getInitials = (name) => {
     if (!name) return '-';
     return name.split(' ').map(n => n[0]).join('.').toUpperCase() + '.';
   };
 
-  // Determine Stepper Active Index
-  let currentStepIndex = 1; // Default Registrasi
+  // Posisi stepper di halaman detail: index 0-5 sesuai STEP_STAGES
+  let currentStepIndex = 1; // Default: Registrasi
   if (activeAction === 'assessment') currentStepIndex = 2;
   if (activeAction === 'intervensi') currentStepIndex = 3;
   if (activeAction === 'monitoring') currentStepIndex = 4;
   if (activeAction === 'detail' && selectedItem?.status === 'selesai') currentStepIndex = 5;
+
+  // ==================== RENDER ====================
 
   return (
     <div className="dashboard-body" style={{ display: 'flex', minHeight: '100vh' }}>
@@ -304,132 +316,19 @@ export default function DashboardDP3A() {
           <>
             {activeMenu === 'beranda' && (() => {
               const allDataForCharts = [...lapBaru, ...kasAktif, ...kasSels];
-              
-              // Bar Chart Data
-              const jenisKasusCounts = {};
-              allDataForCharts.forEach(d => {
-                const k = d.jenis_kekerasan || 'Lainnya';
-                jenisKasusCounts[k] = (jenisKasusCounts[k] || 0) + 1;
-              });
-              const jenisKasusData = Object.entries(jenisKasusCounts).sort((a,b) => b[1] - a[1]).slice(0,4);
-              const maxJenisKasus = Math.max(...jenisKasusData.map(d => d[1]), 10);
-
-              // Donut Chart Data
-              let anakPr = 0, anakLk = 0, dewasaPr = 0;
-              allDataForCharts.forEach(d => {
-                const u = parseInt(d.usia_korban) || 0;
-                const jk = (d.jenis_kelamin || '').toLowerCase();
-                if (u < 18) {
-                  if (jk === 'perempuan') anakPr++;
-                  else anakLk++;
-                } else {
-                  if (jk === 'perempuan') dewasaPr++;
-                }
-              });
-              const totalDemo = anakPr + anakLk + dewasaPr || 1;
-              const donutData = [
-                { label: 'Perempuan Dewasa', value: dewasaPr, color: '#3b82f6', percent: (dewasaPr/totalDemo)*100 },
-                { label: 'Anak Perempuan', value: anakPr, color: '#ec4899', percent: (anakPr/totalDemo)*100 },
-                { label: 'Anak Laki-laki', value: anakLk, color: '#f59e0b', percent: (anakLk/totalDemo)*100 },
-              ];
-              let cumulativeDash = 0;
 
               return (
                 <>
                   <div className="row g-3 mb-4">
-                    <div className="col-md-3">
-                      <div className="bento-card mb-0 d-flex align-items-center gap-3">
-                        <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width:'48px', height:'48px', background: '#eff6ff', color: '#2563eb' }}>
-                          <i className="bi bi-file-earmark-text fs-4"></i>
-                        </div>
-                        <div>
-                          <div className="small text-muted fw-bold">Total Laporan</div>
-                          <div className="h4 m-0 fw-bold text-dark">{allDataForCharts.length}</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-md-3">
-                      <div className="bento-card mb-0 d-flex align-items-center gap-3">
-                        <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width:'48px', height:'48px', background: '#fef2f2', color: '#dc2626' }}>
-                          <i className="bi bi-exclamation-circle fs-4"></i>
-                        </div>
-                        <div>
-                          <div className="small text-muted fw-bold">Pengaduan Baru</div>
-                          <div className="h4 m-0 fw-bold text-dark">{lapBaru.length}</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-md-3">
-                      <div className="bento-card mb-0 d-flex align-items-center gap-3">
-                        <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width:'48px', height:'48px', background: '#fffbeb', color: '#d97706' }}>
-                          <i className="bi bi-briefcase fs-4"></i>
-                        </div>
-                        <div>
-                          <div className="small text-muted fw-bold">Sedang Diproses</div>
-                          <div className="h4 m-0 fw-bold text-dark">{kasAktif.length}</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-md-3">
-                      <div className="bento-card mb-0 d-flex align-items-center gap-3">
-                        <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width:'48px', height:'48px', background: '#f0fdf4', color: '#16a34a' }}>
-                          <i className="bi bi-check-circle fs-4"></i>
-                        </div>
-                        <div>
-                          <div className="small text-muted fw-bold">Selesai / Terminasi</div>
-                          <div className="h4 m-0 fw-bold text-dark">{kasSels.length}</div>
-                        </div>
-                      </div>
-                    </div>
+                    <StatCard icon="bi-file-earmark-text" iconBg="#eff6ff" iconColor="#2563eb" label="Total Laporan" value={allDataForCharts.length} />
+                    <StatCard icon="bi-exclamation-circle" iconBg="#fef2f2" iconColor="#dc2626" label="Pengaduan Baru" value={lapBaru.length} />
+                    <StatCard icon="bi-briefcase" iconBg="#fffbeb" iconColor="#d97706" label="Sedang Diproses" value={kasAktif.length} />
+                    <StatCard icon="bi-check-circle" iconBg="#f0fdf4" iconColor="#16a34a" label="Selesai / Terminasi" value={kasSels.length} />
                   </div>
 
                   <div className="row g-4 mb-4">
-                    <div className="col-lg-8">
-                      <div className="bento-card h-100">
-                        <div className="fw-bold mb-4">Tren Jenis Kasus Tahun Ini</div>
-                        <div className="bar-chart-mini position-relative">
-                          {/* Y-Axis lines */}
-                          <div className="position-absolute w-100 h-100" style={{ zIndex: 0, left: 0, top: 0, pointerEvents: 'none', display: 'flex', flexDirection: 'column' }}>
-                            <div className="border-bottom border-dashed" style={{ flex: 1, opacity: 0.5 }}></div>
-                            <div className="border-bottom border-dashed" style={{ flex: 1, opacity: 0.5 }}></div>
-                            <div className="border-bottom border-dashed" style={{ flex: 1, opacity: 0.5 }}></div>
-                          </div>
-                          {jenisKasusData.map(([label, val], idx) => (
-                            <div key={idx} className="bar-item-wrapper">
-                              <div className="bar-item" style={{ height: `${(val/maxJenisKasus)*100}%` }} data-val={val}></div>
-                              <div className="bar-label">{label}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-lg-4">
-                      <div className="bento-card h-100">
-                        <div className="fw-bold mb-4">Demografi Korban</div>
-                        <div className="donut-chart-container">
-                          <svg className="donut-svg" viewBox="0 0 160 160">
-                            <circle cx="80" cy="80" r="65" fill="transparent" stroke="#f1f5f9" strokeWidth="20" />
-                            {donutData.map((d, i) => {
-                              const dashLength = (d.percent / 100) * 408.4;
-                              const offset = -cumulativeDash;
-                              cumulativeDash += dashLength;
-                              if (d.value === 0) return null;
-                              return (
-                                <circle key={i} cx="80" cy="80" r="65" fill="transparent" stroke={d.color} strokeWidth="20" strokeDasharray={`${dashLength} 408.4`} strokeDashoffset={offset} style={{ transition: '0.3s' }} />
-                              );
-                            })}
-                          </svg>
-                          <div className="donut-legend">
-                            {donutData.map((d, i) => (
-                              <div key={i} className="legend-item">
-                                <div><span className="legend-color" style={{ backgroundColor: d.color }}></span> <span className="text-muted">{d.label}</span></div>
-                                <div className="fw-bold">{d.value}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <div className="col-lg-8"><JenisKasusChart data={allDataForCharts} /></div>
+                    <div className="col-lg-4"><DemografiChart data={allDataForCharts} /></div>
                   </div>
 
                   <div className="bento-card">
@@ -445,7 +344,7 @@ export default function DashboardDP3A() {
                           </tr>
                         </thead>
                         <tbody>
-                          {allActiveList.slice(0,5).map(item => (
+                          {allActiveList.slice(0, 5).map(item => (
                             <tr key={item.id || item._id}>
                               <td>
                                 <div className="fw-bold text-dark">{item.kode_laporan}</div>
@@ -599,12 +498,12 @@ export default function DashboardDP3A() {
               <div className="stepper-container my-5">
                 <div className="stepper-line"></div>
                 <div className="stepper-line-active" style={{ width: `${(currentStepIndex / (STEP_STAGES.length - 1)) * 90}%` }}></div>
-                
+
                 {STEP_STAGES.map((step, idx) => {
                   let statusClass = '';
                   if (idx < currentStepIndex) statusClass = 'completed';
                   else if (idx === currentStepIndex) statusClass = 'active';
-                  
+
                   return (
                     <div key={step.id} className={`stepper-item ${statusClass}`}>
                       <div className="stepper-circle">
@@ -660,12 +559,12 @@ export default function DashboardDP3A() {
                   <div className="card h-100 border rounded-4 shadow-none">
                     <div className="card-body p-4">
                       <h6 className="fw-bold mb-4 d-flex align-items-center gap-2"><i className="bi bi-file-earmark-text fs-5"></i> Informasi Kejadian</h6>
-                      
+
                       <div className="mb-4">
                         <label className="small text-muted d-block mb-1">Jenis Kasus</label>
                         <span className="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2 py-1">{detailData.jenis_kekerasan}</span>
                       </div>
-                      
+
                       <div className="mb-4">
                         <label className="small text-muted d-block mb-1">Alamat Kejadian / Domisili Korban</label>
                         <span className="fw-semibold">{detailData.lokasi_kejadian}, {detailData.kelurahan_korban}</span>
@@ -747,7 +646,7 @@ export default function DashboardDP3A() {
                           </div>
                         </div>
                       )}
-                      
+
                       {detailData.metode_penanganan && (
                         <div className="col-12 pb-2">
                           <h6 className="fw-bold text-dark mb-3 small text-uppercase"><i className="bi bi-check-circle-fill text-success me-2"></i>Tahap Rencana Intervensi</h6>
@@ -776,7 +675,7 @@ export default function DashboardDP3A() {
                     <small className="text-muted">Lengkapi data berikut untuk melanjutkan ke tahap selanjutnya.</small>
                   </div>
                   <div className="action-form-body">
-                    
+
                     {activeAction === 'registrasi' && (
                       <>
                         <div className="mb-4">

@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import laporanService from '../services/laporanService';
+import CeritaKejadianStep from '../components/landing/CeritaKejadianStep';
 import './Landing.css';
 import logo from '../assets/logo.png';
-
-const API_REPORT = 'http://localhost:8080/api';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -19,6 +18,10 @@ export default function LandingPage() {
   // Master Data State
   const [masterKekerasan, setMasterKekerasan] = useState([]);
 
+  // Alur "cerita dulu, form auto-fill" (prototipe UX, nlp-service masih mock)
+  const [showCeritaStep, setShowCeritaStep] = useState(true);
+  const [autoFillNotice, setAutoFillNotice] = useState(null); // null | 'success' | 'failed'
+
   // Laporan form state (Single-step)
   const [isAnonim, setIsAnonim] = useState(false);
   const [loadingSubmit, setLoadingSubmit] = useState(false);
@@ -32,13 +35,40 @@ export default function LandingPage() {
   });
 
   useEffect(() => {
-    axios.get(`${API_REPORT}/master/kekerasan?all=false`)
-      .then(res => setMasterKekerasan(res.data))
+    laporanService.getMasterKekerasan()
+      .then(setMasterKekerasan)
       .catch(err => console.error('Gagal memuat kategori:', err));
   }, []);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   const handleFileChange = (e) => setFotoBukti(e.target.files[0] || null);
+
+  // Dipanggil CeritaKejadianStep setelah analisis AI selesai (berhasil ataupun gagal)
+  const handleCeritaSelesai = (kronologiText, telepon, extracted, failed) => {
+    setFormData(prev => ({
+      ...prev,
+      kronologi: kronologiText,
+      teleponPelapor: telepon || prev.teleponPelapor,
+      ...(extracted && !failed ? {
+        usiaKorban: extracted.usiaKorban || prev.usiaKorban,
+        jenisKelamin: extracted.jenisKelamin || prev.jenisKelamin,
+        jenisKekerasan: extracted.jenisKekerasan || prev.jenisKekerasan,
+      } : {}),
+    }));
+    setAutoFillNotice(failed ? 'failed' : 'success');
+    setShowCeritaStep(false);
+  };
+
+  // Dipanggil kalau pelapor memilih lewati AI dan isi form manual dari awal
+  const handleSkipCerita = (kronologiText, telepon) => {
+    setFormData(prev => ({
+      ...prev,
+      kronologi: kronologiText,
+      teleponPelapor: telepon || prev.teleponPelapor,
+    }));
+    setAutoFillNotice(null);
+    setShowCeritaStep(false);
+  };
 
   const handleCekStatus = async (e) => {
     e.preventDefault();
@@ -46,8 +76,7 @@ export default function LandingPage() {
     setLoadingStatus(true);
     setErrorStatus('');
     try {
-      const res = await axios.get(`${API_REPORT}/laporan/status/${kodeLaporan}`);
-      setStatusResult(res.data);
+      setStatusResult(await laporanService.cekStatus(kodeLaporan));
     } catch (err) {
       setErrorStatus(`Laporan ${kodeLaporan} tidak ditemukan.`);
       setStatusResult(null);
@@ -102,8 +131,8 @@ export default function LandingPage() {
     if (fotoBukti) fd.append('bukti_file', fotoBukti);
 
     try {
-      const res = await axios.post(`${API_REPORT}/laporan`, fd);
-      setSubmitResult(res.data.kode_laporan || res.data?.data?.kode_laporan);
+      const res = await laporanService.submitLaporan(fd);
+      setSubmitResult(res.kode_laporan || res?.data?.kode_laporan);
     } catch (err) {
       alert('Gagal: ' + (err.response?.data?.message || err.message));
     } finally {
@@ -220,9 +249,9 @@ export default function LandingPage() {
                     <div className="mb-5 mt-4 px-3">
                       <div className="tracker-stepper">
                         <div className="tracker-line">
-                          <div className="tracker-line-fill" style={{ 
+                          <div className="tracker-line-fill" style={{
                             width: statusResult.status === 'selesai' ? '100%' :
-                                   statusResult.status === 'proses_penanganan' ? '66%' :
+                                   statusResult.status === 'dalam_penanganan' ? '66%' :
                                    statusResult.status === 'proses_assessment' ? '33%' : '0%'
                           }}></div>
                         </div>
@@ -230,7 +259,7 @@ export default function LandingPage() {
                         {[
                           { id: 'menunggu_registrasi', label: 'Terkirim', icon: 'bi-send-fill' },
                           { id: 'proses_assessment', label: 'Assessment', icon: 'bi-clipboard-check-fill' },
-                          { id: 'proses_penanganan', label: 'Penanganan', icon: 'bi-activity' },
+                          { id: 'dalam_penanganan', label: 'Penanganan', icon: 'bi-activity' },
                           { id: 'selesai', label: 'Selesai', icon: 'bi-check-circle-fill' }
                         ].map((step, idx, arr) => {
                           const isCompleted = arr.findIndex(s => s.id === statusResult.status) >= idx;
@@ -267,9 +296,38 @@ export default function LandingPage() {
               </div>
             )}
 
-            {/* TAB LAPOR */}
-            {activeTab === 'lapor' && !submitResult && (
+            {/* TAB LAPOR - Langkah 1: Cerita bebas + auto-fill AI (mock, lihat nlpService.js) */}
+            {activeTab === 'lapor' && !submitResult && showCeritaStep && (
+              <CeritaKejadianStep
+                masterKekerasan={masterKekerasan}
+                teleponAwal={formData.teleponPelapor}
+                onSelesai={handleCeritaSelesai}
+                onSkip={handleSkipCerita}
+              />
+            )}
+
+            {/* TAB LAPOR - Langkah 2: Form detail (sudah ada sebelumnya, tetap sama;
+                cuma sekarang bisa datang dalam keadaan sudah terisi sebagian) */}
+            {activeTab === 'lapor' && !submitResult && !showCeritaStep && (
               <form onSubmit={handlePreSubmit}>
+                {autoFillNotice === 'success' && (
+                  <div className="alert-callout mb-4" style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }}>
+                    <i className="bi bi-stars fs-4" style={{ color: '#0e94eb' }}></i>
+                    <div>
+                      <h5 className="fw-bold mb-1" style={{ fontSize: '0.875rem', color: '#0e94eb' }}>Beberapa Data Terisi Otomatis</h5>
+                      <p className="mb-0" style={{ fontSize: '0.875rem', color: '#0e94eb', opacity: 0.85 }}>Sistem mendeteksi beberapa informasi dari cerita Anda. Silakan periksa dan koreksi jika ada yang kurang tepat sebelum mengirim.</p>
+                    </div>
+                  </div>
+                )}
+                {autoFillNotice === 'failed' && (
+                  <div className="alert-callout mb-4" style={{ backgroundColor: '#fffbeb', borderColor: '#fde68a' }}>
+                    <i className="bi bi-exclamation-triangle-fill fs-4 text-warning"></i>
+                    <div>
+                      <h5 className="fw-bold mb-1" style={{ fontSize: '0.875rem', color: '#92400e' }}>Pengisian Otomatis Sedang Tidak Tersedia</h5>
+                      <p className="mb-0" style={{ fontSize: '0.875rem', color: '#92400e' }}>Tidak masalah — cerita Anda sudah tersimpan, silakan lengkapi bagian lain di form ini secara manual.</p>
+                    </div>
+                  </div>
+                )}
                 <div className="alert-callout mb-4">
                   <i className="bi bi-info-circle-fill fs-4 text-success"></i>
                   <div>

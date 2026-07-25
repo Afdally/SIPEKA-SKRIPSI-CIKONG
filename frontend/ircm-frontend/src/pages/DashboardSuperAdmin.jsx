@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import logo from '../assets/logo.png';
-
-const API_AUTH = 'http://localhost:8080/api/auth';
-const API_CASE = 'http://localhost:8080/api';
-const API_REPORT = 'http://localhost:8080/api';
-
+import authService from '../services/authService';
+import laporanService from '../services/laporanService';
+import kasusService from '../services/kasusService';
+import StatCard from '../components/dashboard/StatCard';
+import JenisKasusChart from '../components/dashboard/JenisKasusChart';
+import DemografiChart from '../components/dashboard/DemografiChart';
+import ActivityFeed from '../components/dashboard/ActivityFeed';
 import './Dashboard.css';
 
 const MENU_ITEMS = [
@@ -18,27 +19,30 @@ const MENU_ITEMS = [
 
 export default function DashboardSuperAdmin() {
   const navigate = useNavigate();
+
+  // ==================== STATE ====================
+
   const [user, setUser] = useState(null);
   const [activeMenu, setActiveMenu] = useState('dashboard');
 
-  // Laporan & Filters (untuk menu Data Pelaporan)
+  // Laporan & filter-nya (dipakai di tab Dashboard dan Data Pelaporan)
   const [allReports, setAllReports] = useState([]);
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterRegion, setFilterRegion] = useState('');
   const [filterKategori, setFilterKategori] = useState('');
 
-  // Data States
+  // Data dari service lain
   const [stats, setStats] = useState({ summary: null, kinerja: [] });
   const [usersList, setUsersList] = useState([]);
   const [masterKekerasan, setMasterKekerasan] = useState([]);
   const [masterMetode, setMasterMetode] = useState([]);
 
-  // Form States (Users)
+  // State form modal "Manajemen Petugas"
   const [showUserModal, setShowUserModal] = useState(false);
   const [userForm, setUserForm] = useState({ id: '', name: '', email: '', password: '', role: 'petugas_uptd' });
 
-  // Form States (Master)
+  // State form modal "Pusat Kendali Layanan"
   const [activeMasterTab, setActiveMasterTab] = useState('kekerasan');
   const [showMasterModal, setShowMasterModal] = useState(false);
   const [masterType, setMasterType] = useState(''); // 'kekerasan' | 'metode'
@@ -46,49 +50,46 @@ export default function DashboardSuperAdmin() {
 
   const getToken = () => localStorage.getItem('sipeka_token');
 
+  // ==================== DATA FETCHING ====================
+  // Tiap tab menu punya data sendiri, jadi cuma di-fetch pas tab itu aktif.
+
   const fetchStats = async (tok) => {
     try {
-      const hdrs = { headers: { Authorization: `Bearer ${tok}` } };
-      const [rSum, rKin, rRep] = await Promise.all([
-        axios.get(`${API_CASE}/penanganan/stats/summary`, hdrs),
-        axios.get(`${API_CASE}/penanganan/stats/kinerja`, hdrs),
-        axios.get(`${API_REPORT}/laporan`, hdrs)
+      const [summary, kinerja] = await Promise.all([
+        kasusService.getStatsSummary(tok),
+        kasusService.getStatsKinerja(tok),
       ]);
-      const summaryData = rSum.data;
-      summaryData.total_kasus = rRep.data.data.length; // Override agar menghitung seluruh laporan masuk
-      setStats({ summary: summaryData, kinerja: rKin.data });
+      setStats({ summary, kinerja });
     } catch (e) { console.error(e); }
   };
 
   const fetchUsers = async (tok) => {
     try {
-      const res = await axios.get(`${API_AUTH}/users`, { headers: { Authorization: `Bearer ${tok}` } });
-      setUsersList(res.data);
+      setUsersList(await authService.getUsers(tok));
     } catch (e) { console.error(e); }
   };
 
   const fetchMaster = async (tok) => {
     try {
-      const hdrs = { headers: { Authorization: `Bearer ${tok}` } };
-      const [rKek, rMet] = await Promise.all([
-        axios.get(`${API_REPORT}/master/kekerasan?all=true`, hdrs),
-        axios.get(`${API_CASE}/master/metode?all=true`, hdrs)
+      const [kekerasan, metode] = await Promise.all([
+        laporanService.getMasterKekerasanAll(tok),
+        kasusService.getMasterMetodeAll(tok),
       ]);
-      setMasterKekerasan(rKek.data);
-      setMasterMetode(rMet.data);
+      setMasterKekerasan(kekerasan);
+      setMasterMetode(metode);
     } catch (e) { console.error(e); }
   };
 
   const fetchReportsData = async (tok) => {
     try {
-      const res = await axios.get(`${API_REPORT}/laporan`, { headers: { Authorization: `Bearer ${tok}` } });
-      setAllReports(res.data.data);
+      setAllReports(await laporanService.getAll(tok));
     } catch (e) { console.error(e); }
   };
 
   const fetchAll = useCallback(async (tok) => {
     const t = tok || getToken();
-    if (activeMenu === 'dashboard') fetchStats(t);
+    // Tab Dashboard butuh allReports juga untuk chart & kartu ringkasan.
+    if (activeMenu === 'dashboard') { fetchStats(t); fetchReportsData(t); }
     if (activeMenu === 'users') fetchUsers(t);
     if (activeMenu === 'master') fetchMaster(t);
     if (activeMenu === 'export') fetchReportsData(t);
@@ -108,19 +109,17 @@ export default function DashboardSuperAdmin() {
     navigate('/login');
   };
 
-  // --- ACTIONS: USERS ---
+  // ==================== ACTIONS: MANAJEMEN PETUGAS ====================
+
   const saveUser = async (e) => {
     e.preventDefault();
     try {
-      const hdrs = { headers: { Authorization: `Bearer ${getToken()}` } };
       if (userForm.id) {
-        // Edit
         const payload = { name: userForm.name, email: userForm.email, role: userForm.role };
         if (userForm.password) payload.password = userForm.password;
-        await axios.put(`${API_AUTH}/users/${userForm.id}`, payload, hdrs);
+        await authService.updateUser(getToken(), userForm.id, payload);
       } else {
-        // Create
-        await axios.post(`${API_AUTH}/users`, userForm, hdrs);
+        await authService.createUser(getToken(), userForm);
       }
       setShowUserModal(false);
       fetchUsers(getToken());
@@ -132,7 +131,7 @@ export default function DashboardSuperAdmin() {
   const deleteUser = async (id) => {
     if (!window.confirm('Yakin hapus akun petugas ini?')) return;
     try {
-      await axios.delete(`${API_AUTH}/users/${id}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      await authService.deleteUser(getToken(), id);
       fetchUsers(getToken());
     } catch (err) { alert(err.response?.data?.message || 'Error'); }
   };
@@ -143,23 +142,25 @@ export default function DashboardSuperAdmin() {
     setShowUserModal(true);
   };
 
-  // --- ACTIONS: MASTER DATA ---
+  // ==================== ACTIONS: PUSAT KENDALI LAYANAN ====================
+
   const saveMaster = async (e) => {
     e.preventDefault();
     try {
-      const hdrs = { headers: { Authorization: `Bearer ${getToken()}` } };
-      const endpoint = masterType === 'kekerasan' ? `${API_REPORT}/master/kekerasan` : `${API_CASE}/master/metode`;
+      const tok = getToken();
       const payload = masterType === 'kekerasan'
         ? { nama_kategori: masterForm.nama, deskripsi: masterForm.deskripsi, is_active: masterForm.is_active }
         : { nama_metode: masterForm.nama, deskripsi: masterForm.deskripsi, is_active: masterForm.is_active };
 
-      if (masterForm.id) {
-        await axios.put(`${endpoint}/${masterForm.id}`, payload, hdrs);
+      if (masterType === 'kekerasan') {
+        if (masterForm.id) await laporanService.updateMasterKekerasan(tok, masterForm.id, payload);
+        else await laporanService.createMasterKekerasan(tok, payload);
       } else {
-        await axios.post(endpoint, payload, hdrs);
+        if (masterForm.id) await kasusService.updateMasterMetode(tok, masterForm.id, payload);
+        else await kasusService.createMasterMetode(tok, payload);
       }
       setShowMasterModal(false);
-      fetchMaster(getToken());
+      fetchMaster(tok);
     } catch (err) {
       alert(err.response?.data?.message || 'Error saving master data');
     }
@@ -168,9 +169,10 @@ export default function DashboardSuperAdmin() {
   const deleteMaster = async (type, id) => {
     if (!window.confirm('Yakin hapus data master ini? Bisa berdampak pada history.')) return;
     try {
-      const endpoint = type === 'kekerasan' ? `${API_REPORT}/master/kekerasan` : `${API_CASE}/master/metode`;
-      await axios.delete(`${endpoint}/${id}`, { headers: { Authorization: `Bearer ${getToken()}` } });
-      fetchMaster(getToken());
+      const tok = getToken();
+      if (type === 'kekerasan') await laporanService.deleteMasterKekerasan(tok, id);
+      else await kasusService.deleteMasterMetode(tok, id);
+      fetchMaster(tok);
     } catch (err) { alert(err.response?.data?.message || 'Error'); }
   };
 
@@ -189,10 +191,10 @@ export default function DashboardSuperAdmin() {
     setShowMasterModal(true);
   };
 
-  // --- ACTIONS: EXPORT / DATA PELAPORAN ---
+  // ==================== ACTIONS: DATA PELAPORAN / EXPORT ====================
+
   const getFilteredReports = () => {
     return allReports.filter(r => {
-      // Filter Tanggal (berdasarkan tanggal_kejadian)
       if (filterStartDate) {
         const rDate = new Date(r.tanggal_kejadian);
         const sDate = new Date(filterStartDate);
@@ -204,9 +206,7 @@ export default function DashboardSuperAdmin() {
         eDate.setHours(23, 59, 59, 999);
         if (rDate > eDate) return false;
       }
-      // Filter Wilayah
       if (filterRegion && r.kelurahan_korban !== filterRegion) return false;
-      // Filter Kategori (Anak / Perempuan)
       if (filterKategori && r.tipe_laporan !== filterKategori) return false;
       return true;
     });
@@ -246,6 +246,8 @@ export default function DashboardSuperAdmin() {
   };
 
   if (!user) return null;
+
+  // ==================== RENDER ====================
 
   return (
     <div className="dashboard-body" style={{ display: 'flex', minHeight: '100vh' }}>
@@ -292,142 +294,21 @@ export default function DashboardSuperAdmin() {
           </div>
         </div>
 
-        {/* 1. EKSEKUTIF DASHBOARD (Bento UI) */}
+        {/* 1. TAB DASHBOARD (ringkasan eksekutif) */}
         {activeMenu === 'dashboard' && stats.summary && (
           <div className="bento-container">
-            {/* ROW 1: Summary Metrics */}
             <div className="row g-3 mb-4">
-              <div className="col-md-3">
-                <div className="bento-card mb-0 d-flex align-items-center gap-3">
-                  <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width:'48px', height:'48px', background: '#eff6ff', color: '#2563eb' }}>
-                    <i className="bi bi-file-earmark-text fs-4"></i>
-                  </div>
-                  <div>
-                    <div className="small text-muted fw-bold">Total Laporan</div>
-                    <div className="h4 m-0 fw-bold text-dark">{stats.summary.total_kasus}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-3">
-                <div className="bento-card mb-0 d-flex align-items-center gap-3">
-                  <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width:'48px', height:'48px', background: '#fef2f2', color: '#dc2626' }}>
-                    <i className="bi bi-exclamation-circle fs-4"></i>
-                  </div>
-                  <div>
-                    <div className="small text-muted fw-bold">Menunggu Verifikasi</div>
-                    <div className="h4 m-0 fw-bold text-dark">{stats.summary.menunggu_registrasi || 0}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-3">
-                <div className="bento-card mb-0 d-flex align-items-center gap-3">
-                  <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width:'48px', height:'48px', background: '#fffbeb', color: '#d97706' }}>
-                    <i className="bi bi-briefcase fs-4"></i>
-                  </div>
-                  <div>
-                    <div className="small text-muted fw-bold">Sedang Diproses</div>
-                    <div className="h4 m-0 fw-bold text-dark">{(stats.summary.proses_assessment || 0) + (stats.summary.proses_penanganan || 0)}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-3">
-                <div className="bento-card mb-0 d-flex align-items-center gap-3">
-                  <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width:'48px', height:'48px', background: '#f0fdf4', color: '#16a34a' }}>
-                    <i className="bi bi-check-circle fs-4"></i>
-                  </div>
-                  <div>
-                    <div className="small text-muted fw-bold">Kasus Selesai</div>
-                    <div className="h4 m-0 fw-bold text-dark">{stats.summary.selesai}</div>
-                  </div>
-                </div>
-              </div>
+              <StatCard icon="bi-file-earmark-text" iconBg="#eff6ff" iconColor="#2563eb" label="Total Laporan" value={allReports.length} />
+              <StatCard icon="bi-exclamation-circle" iconBg="#fef2f2" iconColor="#dc2626" label="Menunggu Verifikasi" value={allReports.filter(r => r.status === 'menunggu_registrasi').length} />
+              <StatCard icon="bi-briefcase" iconBg="#fffbeb" iconColor="#d97706" label="Sedang Diproses" value={stats.summary.dalam_proses || 0} />
+              <StatCard icon="bi-check-circle" iconBg="#f0fdf4" iconColor="#16a34a" label="Kasus Selesai" value={stats.summary.selesai} />
             </div>
 
-            {/* ROW 2: Main Analytics */}
             <div className="row g-4 mb-4">
-              {(() => {
-                // Bar Chart Data (Jenis Kasus)
-                const jenisKasusCounts = {};
-                allReports.forEach(d => {
-                  const k = d.jenis_kekerasan || 'Lainnya';
-                  jenisKasusCounts[k] = (jenisKasusCounts[k] || 0) + 1;
-                });
-                const jenisKasusData = Object.entries(jenisKasusCounts).sort((a,b) => b[1] - a[1]).slice(0,4);
-                const maxJenisKasus = Math.max(...jenisKasusData.map(d => d[1]), 10);
-
-                // Donut Chart Data (Demografi)
-                let anakPr = 0, anakLk = 0, dewasaPr = 0;
-                allReports.forEach(d => {
-                  const u = parseInt(d.usia_korban) || 0;
-                  const jk = (d.jenis_kelamin || '').toLowerCase();
-                  if (u < 18) {
-                    if (jk === 'perempuan') anakPr++;
-                    else anakLk++;
-                  } else {
-                    if (jk === 'perempuan') dewasaPr++;
-                  }
-                });
-                const totalDemo = anakPr + anakLk + dewasaPr || 1;
-                const donutData = [
-                  { label: 'Perempuan Dewasa', value: dewasaPr, color: '#3b82f6', percent: (dewasaPr/totalDemo)*100 },
-                  { label: 'Anak Perempuan', value: anakPr, color: '#ec4899', percent: (anakPr/totalDemo)*100 },
-                  { label: 'Anak Laki-laki', value: anakLk, color: '#f59e0b', percent: (anakLk/totalDemo)*100 },
-                ];
-                let cumulativeDash = 0;
-
-                return (
-                  <>
-                    <div className="col-lg-8">
-                      <div className="bento-card h-100">
-                        <div className="fw-bold mb-4">Tren Jenis Kasus Tahun Ini</div>
-                        <div className="bar-chart-mini position-relative">
-                          <div className="position-absolute w-100 h-100" style={{ zIndex: 0, left: 0, top: 0, pointerEvents: 'none', display: 'flex', flexDirection: 'column' }}>
-                            <div className="border-bottom border-dashed" style={{ flex: 1, opacity: 0.5 }}></div>
-                            <div className="border-bottom border-dashed" style={{ flex: 1, opacity: 0.5 }}></div>
-                            <div className="border-bottom border-dashed" style={{ flex: 1, opacity: 0.5 }}></div>
-                          </div>
-                          {jenisKasusData.map(([label, val], idx) => (
-                            <div key={idx} className="bar-item-wrapper">
-                              <div className="bar-item" style={{ height: `${(val/maxJenisKasus)*100}%` }} data-val={val}></div>
-                              <div className="bar-label">{label}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-lg-4">
-                      <div className="bento-card h-100">
-                        <div className="fw-bold mb-4">Demografi Korban</div>
-                        <div className="donut-chart-container">
-                          <svg className="donut-svg" viewBox="0 0 160 160">
-                            <circle cx="80" cy="80" r="65" fill="transparent" stroke="#f1f5f9" strokeWidth="20" />
-                            {donutData.map((d, i) => {
-                              const dashLength = (d.percent / 100) * 408.4;
-                              const offset = -cumulativeDash;
-                              cumulativeDash += dashLength;
-                              if (d.value === 0) return null;
-                              return (
-                                <circle key={i} cx="80" cy="80" r="65" fill="transparent" stroke={d.color} strokeWidth="20" strokeDasharray={`${dashLength} 408.4`} strokeDashoffset={offset} style={{ transition: '0.3s' }} />
-                              );
-                            })}
-                          </svg>
-                          <div className="donut-legend">
-                            {donutData.map((d, i) => (
-                              <div key={i} className="legend-item">
-                                <div><span className="legend-color" style={{ backgroundColor: d.color }}></span> <span className="text-muted">{d.label}</span></div>
-                                <div className="fw-bold">{d.value}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                );
-              })()}
+              <div className="col-lg-8"><JenisKasusChart data={allReports} /></div>
+              <div className="col-lg-4"><DemografiChart data={allReports} /></div>
             </div>
 
-            {/* ROW 3: Tracking & Kinerja */}
             <div className="row g-4">
               <div className="col-lg-7">
                 <div className="bento-card">
@@ -454,41 +335,13 @@ export default function DashboardSuperAdmin() {
                 </div>
               </div>
               <div className="col-lg-5">
-                <div className="bento-card">
-                  <div className="bento-title"><i className="bi bi-activity text-danger"></i> Aktivitas Penanganan Terbaru</div>
-                  <div className="mt-3">
-                    <div className="activity-item active">
-                      <div className="activity-content">
-                        <strong>Petugas Admin</strong> baru saja memverifikasi laporan <span className="text-primary">LP-2026-XQI4Z</span>
-                        <span className="activity-time">2 menit yang lalu</span>
-                      </div>
-                    </div>
-                    <div className="activity-item">
-                      <div className="activity-content">
-                        Kasus <span className="text-primary">LP-2026-WHYM5</span> telah selesai ditangani oleh Petugas UPTD
-                        <span className="activity-time">1 jam yang lalu</span>
-                      </div>
-                    </div>
-                    <div className="activity-item">
-                      <div className="activity-content">
-                        Assessment dimulai untuk laporan <span className="text-primary">LP-2026-1113G</span>
-                        <span className="activity-time">3 jam yang lalu</span>
-                      </div>
-                    </div>
-                    <div className="activity-item">
-                      <div className="activity-content">
-                        Laporan baru diterima dari wilayah <span className="fw-bold">Mandonga</span>
-                        <span className="activity-time">5 jam yang lalu</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <ActivityFeed reports={allReports} />
               </div>
             </div>
           </div>
         )}
 
-        {/* 2. MANAJEMEN PETUGAS */}
+        {/* 2. TAB MANAJEMEN PETUGAS */}
         {activeMenu === 'users' && (
           <div className="master-card">
             <div className="d-flex justify-content-between align-items-center mb-4">
@@ -526,7 +379,7 @@ export default function DashboardSuperAdmin() {
           </div>
         )}
 
-        {/* 3. PUSAT KENDALI LAYANAN */}
+        {/* 3. TAB PUSAT KENDALI LAYANAN (master data) */}
         {activeMenu === 'master' && (
           <div className="master-card">
             <div className="d-flex justify-content-between align-items-center mb-4">
@@ -581,7 +434,7 @@ export default function DashboardSuperAdmin() {
           </div>
         )}
 
-        {/* 4. DATA PELAPORAN */}
+        {/* 4. TAB DATA PELAPORAN (filter + export CSV) */}
         {activeMenu === 'export' && (
           <div className="master-card">
             <div className="d-flex justify-content-between align-items-center mb-4">
@@ -591,7 +444,6 @@ export default function DashboardSuperAdmin() {
               </button>
             </div>
 
-            {/* Filter Section */}
             <div className="row g-3 mb-4 p-3 bg-light rounded-3" style={{ border: '1px solid #e5e7eb' }}>
               <div className="col-md-2">
                 <label className="form-label small fw-bold">Dari Tanggal</label>
@@ -625,7 +477,6 @@ export default function DashboardSuperAdmin() {
               </div>
             </div>
 
-            {/* Tabel */}
             <div className="table-responsive">
               <table className="table dashboard-table mb-0">
                 <thead>

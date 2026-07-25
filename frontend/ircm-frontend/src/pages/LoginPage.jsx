@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import authService from '../services/authService';
 import './Login.css';
-
-const API_AUTH = 'http://localhost:8080/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -58,12 +56,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await axios.post(`${API_AUTH}/auth/login`, { email, password });
-      
-      localStorage.setItem('sipeka_token', res.data.access_token);
-      localStorage.setItem('sipeka_user', JSON.stringify(res.data.user));
-      
-      redirectBasedOnRole(res.data.user.role);
+      const res = await authService.login(email, password);
+
+      localStorage.setItem('sipeka_token', res.access_token);
+      localStorage.setItem('sipeka_user', JSON.stringify(res.user));
+
+      redirectBasedOnRole(res.user.role);
     } catch (err) {
       if (err.response) {
         setErrorMsg(err.response.data.message || 'Email atau password salah.');
