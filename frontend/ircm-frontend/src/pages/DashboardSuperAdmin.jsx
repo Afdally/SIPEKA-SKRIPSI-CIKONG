@@ -24,6 +24,7 @@ export default function DashboardSuperAdmin() {
 
   const [user, setUser] = useState(null);
   const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Laporan & filter-nya (dipakai di tab Dashboard dan Data Pelaporan)
   const [allReports, setAllReports] = useState([]);
@@ -31,6 +32,8 @@ export default function DashboardSuperAdmin() {
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterRegion, setFilterRegion] = useState('');
   const [filterKategori, setFilterKategori] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Data dari service lain
   const [stats, setStats] = useState({ summary: null, kinerja: [] });
@@ -208,6 +211,16 @@ export default function DashboardSuperAdmin() {
       }
       if (filterRegion && r.kelurahan_korban !== filterRegion) return false;
       if (filterKategori && r.tipe_laporan !== filterKategori) return false;
+      if (filterStatus && r.status !== filterStatus) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const match =
+          (r.kode_laporan || '').toLowerCase().includes(q) ||
+          (r.nama_korban || '').toLowerCase().includes(q) ||
+          (r.jenis_kekerasan || '').toLowerCase().includes(q) ||
+          (r.kelurahan_korban || '').toLowerCase().includes(q);
+        if (!match) return false;
+      }
       return true;
     });
   };
@@ -252,18 +265,35 @@ export default function DashboardSuperAdmin() {
   return (
     <div className="dashboard-body" style={{ display: 'flex', minHeight: '100vh' }}>
 
+      {/* OVERLAY MOBILE */}
+      <div
+        className={`sidebar-overlay${sidebarOpen ? ' open' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
       {/* SIDEBAR */}
-      <div className="dashboard-sidebar">
+      <div className={`dashboard-sidebar${sidebarOpen ? ' mobile-open' : ''}`}>
         <div className="brand">
-          <h6>
-            <img src={logo} alt="Logo" style={{ width: '32px', height: 'auto' }} />
-            SUPER ADMIN
-          </h6>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h6>
+              <img src={logo} alt="Logo" style={{ width: '32px', height: 'auto' }} />
+              SUPER ADMIN
+            </h6>
+            {/* Tombol tutup sidebar di mobile */}
+            <button
+              className="hamburger-btn"
+              style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff' }}
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Tutup menu"
+            >
+              <i className="bi bi-x"></i>
+            </button>
+          </div>
           <small style={{ color: '#9ca3af', fontSize: '.75rem' }}>SIPEKA Kota Kendari</small>
         </div>
         <nav style={{ marginTop: '1rem', flex: 1 }}>
           {MENU_ITEMS.map(item => (
-            <div key={item.id} className={`dashboard-nav-link${activeMenu === item.id ? ' active' : ''}`} onClick={() => setActiveMenu(item.id)}>
+            <div key={item.id} className={`dashboard-nav-link${activeMenu === item.id ? ' active' : ''}`} onClick={() => { setActiveMenu(item.id); setSidebarOpen(false); }}>
               <i className={`bi ${item.icon}`}></i> {item.label}
             </div>
           ))}
@@ -276,21 +306,57 @@ export default function DashboardSuperAdmin() {
       {/* MAIN */}
       <div className="dashboard-main" style={{ flex: 1 }}>
         <div className="dashboard-topbar">
-          <h5 className="fw-bold m-0 text-dark">{MENU_ITEMS.find(m => m.id === activeMenu)?.label}</h5>
-          <div className="dropdown">
-            <button className="btn btn-white bg-white border d-flex align-items-center gap-2 rounded-pill shadow-sm dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-              <i className="bi bi-person-circle fs-5 text-primary"></i>
-              <span className="fw-bold text-dark small">{user?.name}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {/* Hamburger — hanya tampil di mobile */}
+            <button
+              className="hamburger-btn"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Buka menu"
+            >
+              <i className="bi bi-list"></i>
             </button>
-            <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-4" aria-labelledby="userDropdown">
-              <li><div className="dropdown-header text-muted">Login sebagai: <br /><strong>{user.email}</strong></div></li>
-              <li><hr className="dropdown-divider" /></li>
-              <li>
-                <button className="dropdown-item text-danger fw-bold d-flex align-items-center gap-2 btn-logout" onClick={handleLogout}>
-                  <i className="bi bi-box-arrow-right"></i> Logout
+            <h5 className="fw-bold m-0 text-dark">{MENU_ITEMS.find(m => m.id === activeMenu)?.label}</h5>
+          </div>
+          <div className="dropdown">
+            <button
+              className="user-avatar-btn dropdown-toggle"
+              type="button"
+              id="userDropdown"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              <div className="user-avatar-circle">
+                {user?.name?.charAt(0).toUpperCase()}
+              </div>
+              <span className="user-avatar-name">{user?.name}</span>
+              <i className="bi bi-chevron-down user-avatar-chevron"></i>
+            </button>
+            <div className="dropdown-menu dropdown-menu-end user-dropdown-menu" aria-labelledby="userDropdown">
+              {/* Header: info user */}
+              <div className="user-dropdown-header">
+                <div className="user-dropdown-avatar">
+                  {user?.name?.charAt(0).toUpperCase()}
+                </div>
+                <div className="user-dropdown-info">
+                  <div className="user-dropdown-name">{user?.name}</div>
+                  <div className="user-dropdown-email">{user?.email}</div>
+                  <span className="user-dropdown-role">Super Admin</span>
+                </div>
+              </div>
+              {/* Menu items */}
+              <div className="user-dropdown-body">
+                <button className="user-dropdown-item">
+                  <i className="bi bi-person"></i> Profil Saya
                 </button>
-              </li>
-            </ul>
+                <button className="user-dropdown-item">
+                  <i className="bi bi-gear"></i> Pengaturan
+                </button>
+              </div>
+              {/* Sign out */}
+              <button className="user-dropdown-signout" onClick={handleLogout}>
+                <i className="bi bi-box-arrow-right"></i> Keluar
+              </button>
+            </div>
           </div>
         </div>
 
@@ -436,47 +502,69 @@ export default function DashboardSuperAdmin() {
 
         {/* 4. TAB DATA PELAPORAN (filter + export CSV) */}
         {activeMenu === 'export' && (
-          <div className="master-card">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h4 className="fw-bold m-0" style={{ color: '#111827' }}>Data Pelaporan</h4>
-              <button className="btn btn-success rounded-pill px-4" onClick={handleExportExcel}>
-                <i className="bi bi-file-earmark-excel me-2"></i> Export Excel
-              </button>
-            </div>
-
-            <div className="row g-3 mb-4 p-3 bg-light rounded-3" style={{ border: '1px solid #e5e7eb' }}>
-              <div className="col-md-2">
-                <label className="form-label small fw-bold">Dari Tanggal</label>
-                <input type="date" className="form-control" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
-              </div>
-              <div className="col-md-2">
-                <label className="form-label small fw-bold">Sampai Tanggal</label>
-                <input type="date" className="form-control" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
-              </div>
-              <div className="col-md-3">
-                <label className="form-label small fw-bold">Wilayah / Kelurahan</label>
-                <select className="form-select" value={filterRegion} onChange={e => setFilterRegion(e.target.value)}>
-                  <option value="">Semua Wilayah</option>
-                  {[...new Set(allReports.map(r => r.kelurahan_korban).filter(Boolean))].sort().map(reg => (
-                    <option key={reg} value={reg}>{reg}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-md-3">
-                <label className="form-label small fw-bold">Kategori</label>
-                <select className="form-select" value={filterKategori} onChange={e => setFilterKategori(e.target.value)}>
-                  <option value="">Semua Kategori</option>
-                  <option value="anak">Anak</option>
-                  <option value="perempuan">Perempuan</option>
-                </select>
-              </div>
-              <div className="col-md-2 d-flex align-items-end">
-                <button className="btn btn-outline-secondary w-100" onClick={() => { setFilterStartDate(''); setFilterEndDate(''); setFilterRegion(''); setFilterKategori(''); }}>
-                  Reset Filter
+          <div className="modern-table-card">
+            {/* Toolbar */}
+            <div className="modern-table-toolbar">
+              <div className="d-flex align-items-center gap-3 flex-wrap">
+                <h6 className="modern-table-title">Data Pelaporan</h6>
+                <button className="btn btn-success btn-sm rounded-pill px-3 fw-bold" onClick={handleExportExcel}>
+                  <i className="bi bi-file-earmark-excel me-1"></i> Export Excel
                 </button>
               </div>
+              <div className="modern-table-controls">
+                {/* Search */}
+                <div className="modern-table-search">
+                  <i className="bi bi-search search-icon"></i>
+                  <input
+                    type="text"
+                    placeholder="Cari laporan..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                {/* Kategori filter pills */}
+                <div className="filter-pills">
+                  <button className={`filter-pill ${filterKategori === '' ? 'active' : ''}`} onClick={() => setFilterKategori('')}>Semua</button>
+                  <button className={`filter-pill ${filterKategori === 'anak' ? 'active' : ''}`} onClick={() => setFilterKategori('anak')}>Anak</button>
+                  <button className={`filter-pill ${filterKategori === 'perempuan' ? 'active' : ''}`} onClick={() => setFilterKategori('perempuan')}>Perempuan</button>
+                </div>
+                {/* Status filter pills */}
+                <div className="filter-pills">
+                  <button className={`filter-pill ${filterStatus === '' ? 'active' : ''}`} onClick={() => setFilterStatus('')}>Semua Status</button>
+                  <button className={`filter-pill ${filterStatus === 'menunggu_registrasi' ? 'active' : ''}`} onClick={() => setFilterStatus('menunggu_registrasi')}>Menunggu</button>
+                  <button className={`filter-pill ${filterStatus === 'penanganan' ? 'active' : ''}`} onClick={() => setFilterStatus('penanganan')}>Proses</button>
+                  <button className={`filter-pill ${filterStatus === 'selesai' ? 'active' : ''}`} onClick={() => setFilterStatus('selesai')}>Selesai</button>
+                </div>
+                {/* Reset */}
+                {(searchQuery || filterKategori || filterStatus || filterStartDate || filterEndDate || filterRegion) && (
+                  <button
+                    className="btn btn-sm btn-light text-muted rounded-pill px-3"
+                    onClick={() => { setSearchQuery(''); setFilterKategori(''); setFilterStatus(''); setFilterStartDate(''); setFilterEndDate(''); setFilterRegion(''); }}
+                  >
+                    <i className="bi bi-x-circle me-1"></i>Reset
+                  </button>
+                )}
+              </div>
             </div>
 
+            {/* Date & Region filter row (secondary, subtle) */}
+            <div className="d-flex align-items-center gap-2 px-4 py-2 bg-light border-bottom flex-wrap">
+              <small className="text-muted fw-bold me-1">Filter Lanjutan:</small>
+              <input type="date" className="form-control form-control-sm rounded-pill" style={{ width: 'auto' }} value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
+              <small className="text-muted">s/d</small>
+              <input type="date" className="form-control form-control-sm rounded-pill" style={{ width: 'auto' }} value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
+              <select className="form-select form-select-sm rounded-pill" style={{ width: 'auto' }} value={filterRegion} onChange={e => setFilterRegion(e.target.value)}>
+                <option value="">Semua Wilayah</option>
+                {[...new Set(allReports.map(r => r.kelurahan_korban).filter(Boolean))].sort().map(reg => (
+                  <option key={reg} value={reg}>{reg}</option>
+                ))}
+              </select>
+              <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1 ms-auto">
+                {getFilteredReports().length} data
+              </span>
+            </div>
+
+            {/* Table */}
             <div className="table-responsive">
               <table className="table dashboard-table mb-0">
                 <thead>
@@ -500,17 +588,25 @@ export default function DashboardSuperAdmin() {
                           return isNaN(d.getTime()) ? '-' : (r.tanggal_kejadian_format || d.toLocaleDateString('id-ID'));
                         })()}
                       </td>
-                      <td>{r.nama_korban} <br /><span className="text-muted small">{r.usia_korban} Thn - {r.jenis_kelamin}</span></td>
-                      <td>{r.kelurahan_korban}</td>
-                      <td>{r.jenis_kekerasan}</td>
                       <td>
-                        <span className={`badge ${r.tipe_laporan === 'anak' ? 'bg-warning text-dark' : 'bg-info text-dark'}`}>
+                        <div className="fw-semibold text-dark">{r.nama_korban}</div>
+                        <div className="text-muted" style={{ fontSize: '0.76rem' }}>{r.usia_korban} Thn &middot; {r.jenis_kelamin}</div>
+                      </td>
+                      <td><span style={{ fontSize: '0.82rem' }}>{r.kelurahan_korban}</span></td>
+                      <td><span style={{ fontSize: '0.82rem' }}>{r.jenis_kekerasan}</span></td>
+                      <td>
+                        <span className={`status-pill ${r.tipe_laporan === 'anak' ? 'status-pill-warning' : 'status-pill-info'}`}>
                           {r.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan'}
                         </span>
                       </td>
                       <td>
-                        <span className={`badge ${r.status === 'selesai' ? 'bg-success' : r.status === 'menunggu_registrasi' ? 'bg-danger' : 'bg-warning'} text-white`}>
-                          {r.status.replace('_', ' ').toUpperCase()}
+                        <span className={`status-pill ${
+                          r.status === 'selesai' ? 'status-pill-success' :
+                          r.status === 'menunggu_registrasi' ? 'status-pill-danger' :
+                          'status-pill-warning'
+                        }`}>
+                          {r.status === 'selesai' ? 'Selesai' :
+                           r.status === 'menunggu_registrasi' ? 'Menunggu' : 'Diproses'}
                         </span>
                       </td>
                     </tr>

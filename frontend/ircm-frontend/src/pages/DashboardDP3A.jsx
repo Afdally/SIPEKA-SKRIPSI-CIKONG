@@ -35,6 +35,7 @@ export default function DashboardDP3A() {
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'detail'
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Data mentah dari backend: laporan (report-service) & kasus (case-service)
   const [reports, setReports] = useState([]);
@@ -44,6 +45,7 @@ export default function DashboardDP3A() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [activeAction, setActiveAction] = useState('detail');
   const [filterKategori, setFilterKategori] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // State form tiap tahap penanganan
   const [pesanTindakLanjut, setPesanTindakLanjut] = useState('');
@@ -213,8 +215,30 @@ export default function DashboardDP3A() {
   const kasSels = kasusList.filter(k => k.status === 'selesai').map(enrichKasus);
 
   // Filter kategori (Anak/Perempuan) khusus untuk tampilan tabel, tidak mengubah data asli
-  const filteredActiveList = filterKategori ? allActiveList.filter(item => item.tipe_laporan === filterKategori) : allActiveList;
-  const filteredKasSels = filterKategori ? kasSels.filter(k => k.tipe_laporan === filterKategori) : kasSels;
+  const filteredActiveList = allActiveList.filter(item => {
+    if (filterKategori && item.tipe_laporan !== filterKategori) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const match =
+        (item.kode_laporan || '').toLowerCase().includes(q) ||
+        (item.nama_korban || '').toLowerCase().includes(q) ||
+        (item.jenis_kekerasan || '').toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    return true;
+  });
+  const filteredKasSels = kasSels.filter(k => {
+    if (filterKategori && k.tipe_laporan !== filterKategori) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const match =
+        (k.kode_laporan || '').toLowerCase().includes(q) ||
+        (k.nama_korban || '').toLowerCase().includes(q) ||
+        (k.metode_penanganan || '').toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    return true;
+  });
 
   // Data lengkap untuk detail satu laporan/kasus yang lagi dibuka
   let detailData = null;
@@ -266,18 +290,35 @@ export default function DashboardDP3A() {
   return (
     <div className="dashboard-body" style={{ display: 'flex', minHeight: '100vh' }}>
 
+      {/* OVERLAY MOBILE */}
+      <div
+        className={`sidebar-overlay${sidebarOpen ? ' open' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
       {/* SIDEBAR */}
-      <div className="dashboard-sidebar">
+      <div className={`dashboard-sidebar${sidebarOpen ? ' mobile-open' : ''}`}>
         <div className="brand">
-          <h6 className="d-flex align-items-center gap-2">
-            <img src={logo} alt="Logo" style={{ width: '32px', height: 'auto' }} />
-            UPTD PPA
-          </h6>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h6 className="d-flex align-items-center gap-2">
+              <img src={logo} alt="Logo" style={{ width: '32px', height: 'auto' }} />
+              UPTD PPA
+            </h6>
+            {/* Tombol tutup sidebar di mobile */}
+            <button
+              className="hamburger-btn"
+              style={{ border: 'none', background: 'rgba(255,255,255,0.1)', color: '#fff' }}
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Tutup menu"
+            >
+              <i className="bi bi-x"></i>
+            </button>
+          </div>
           <small style={{ color: 'rgba(255,255,255,0.4)', fontSize: '.75rem', fontWeight: '600' }}>SIPEKA Kota Kendari</small>
         </div>
         <nav style={{ marginTop: '1.5rem', flex: 1 }}>
           {MENU_ITEMS.map(item => (
-            <div key={item.id} className={`dashboard-nav-link${activeMenu === item.id && viewMode === 'list' ? ' active' : ''}`} onClick={() => { setActiveMenu(item.id); setViewMode('list'); fetchAll(); }}>
+            <div key={item.id} className={`dashboard-nav-link${activeMenu === item.id && viewMode === 'list' ? ' active' : ''}`} onClick={() => { setActiveMenu(item.id); setViewMode('list'); fetchAll(); setSidebarOpen(false); }}>
               <i className={`bi ${item.icon}`}></i> {item.label}
               {item.id === 'penanganan' && allActiveList.length > 0 && <span className="badge bg-danger text-white ms-auto rounded-pill">{allActiveList.length}</span>}
             </div>
@@ -291,23 +332,59 @@ export default function DashboardDP3A() {
       {/* MAIN CONTENT */}
       <div className="dashboard-main" style={{ flex: 1 }}>
         <div className="dashboard-topbar">
-          <h5 className="fw-bold m-0 text-dark">
-            {viewMode === 'detail' ? 'Detail Laporan' : MENU_ITEMS.find(m => m.id === activeMenu)?.label}
-          </h5>
-          <div className="dropdown">
-            <button className="btn btn-white bg-white border d-flex align-items-center gap-2 rounded-pill shadow-sm dropdown-toggle" type="button" id="userDropdownDP3A" data-bs-toggle="dropdown" aria-expanded="false">
-              <i className="bi bi-person-circle fs-5 text-primary"></i>
-              <span className="fw-bold text-dark small">{user?.name}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {/* Hamburger — hanya tampil di mobile */}
+            <button
+              className="hamburger-btn"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Buka menu"
+            >
+              <i className="bi bi-list"></i>
             </button>
-            <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-4" aria-labelledby="userDropdownDP3A">
-              <li><div className="dropdown-header text-muted">Petugas: <strong>{user?.email}</strong></div></li>
-              <li><hr className="dropdown-divider" /></li>
-              <li>
-                <button className="dropdown-item text-danger fw-bold d-flex align-items-center gap-2" onClick={handleLogout}>
-                  <i className="bi bi-box-arrow-right"></i> Logout
+            <h5 className="fw-bold m-0 text-dark">
+              {viewMode === 'detail' ? 'Detail Laporan' : MENU_ITEMS.find(m => m.id === activeMenu)?.label}
+            </h5>
+          </div>
+          <div className="dropdown">
+            <button
+              className="user-avatar-btn dropdown-toggle"
+              type="button"
+              id="userDropdownDP3A"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              <div className="user-avatar-circle">
+                {user?.name?.charAt(0).toUpperCase()}
+              </div>
+              <span className="user-avatar-name">{user?.name}</span>
+              <i className="bi bi-chevron-down user-avatar-chevron"></i>
+            </button>
+            <div className="dropdown-menu dropdown-menu-end user-dropdown-menu" aria-labelledby="userDropdownDP3A">
+              {/* Header: info user */}
+              <div className="user-dropdown-header">
+                <div className="user-dropdown-avatar">
+                  {user?.name?.charAt(0).toUpperCase()}
+                </div>
+                <div className="user-dropdown-info">
+                  <div className="user-dropdown-name">{user?.name}</div>
+                  <div className="user-dropdown-email">{user?.email}</div>
+                  <span className="user-dropdown-role">Petugas UPTD</span>
+                </div>
+              </div>
+              {/* Menu items */}
+              <div className="user-dropdown-body">
+                <button className="user-dropdown-item">
+                  <i className="bi bi-person"></i> Profil Saya
                 </button>
-              </li>
-            </ul>
+                <button className="user-dropdown-item">
+                  <i className="bi bi-gear"></i> Pengaturan
+                </button>
+              </div>
+              {/* Sign out */}
+              <button className="user-dropdown-signout" onClick={handleLogout}>
+                <i className="bi bi-box-arrow-right"></i> Keluar
+              </button>
+            </div>
           </div>
         </div>
 
@@ -364,16 +441,38 @@ export default function DashboardDP3A() {
             })()}
 
             {activeMenu === 'penanganan' && (
-              <div className="bento-card">
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h6 className="fw-bold m-0">Daftar Kasus Menunggu Penanganan</h6>
-                  <div className="d-flex align-items-center gap-3">
-                    <select className="form-select form-select-sm" style={{ width: '160px' }} value={filterKategori} onChange={e => setFilterKategori(e.target.value)}>
-                      <option value="">Semua Kategori</option>
-                      <option value="anak">Anak</option>
-                      <option value="perempuan">Perempuan</option>
-                    </select>
-                    <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-2">{filteredActiveList.length} Data</span>
+              <div className="modern-table-card">
+                {/* Toolbar */}
+                <div className="modern-table-toolbar">
+                  <h6 className="modern-table-title">Daftar Kasus Menunggu Penanganan</h6>
+                  <div className="modern-table-controls">
+                    {/* Search */}
+                    <div className="modern-table-search">
+                      <i className="bi bi-search search-icon"></i>
+                      <input
+                        type="text"
+                        placeholder="Cari kasus..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    {/* Kategori filter pills */}
+                    <div className="filter-pills">
+                      <button className={`filter-pill ${filterKategori === '' ? 'active' : ''}`} onClick={() => setFilterKategori('')}>Semua</button>
+                      <button className={`filter-pill ${filterKategori === 'anak' ? 'active' : ''}`} onClick={() => setFilterKategori('anak')}>Anak</button>
+                      <button className={`filter-pill ${filterKategori === 'perempuan' ? 'active' : ''}`} onClick={() => setFilterKategori('perempuan')}>Perempuan</button>
+                    </div>
+                    {/* Badge count */}
+                    <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1">{filteredActiveList.length} Data</span>
+                    {/* Reset */}
+                    {(searchQuery || filterKategori) && (
+                      <button
+                        className="btn btn-sm btn-light text-muted rounded-pill px-3"
+                        onClick={() => { setSearchQuery(''); setFilterKategori(''); }}
+                      >
+                        <i className="bi bi-x-circle me-1"></i>Reset
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -400,7 +499,7 @@ export default function DashboardDP3A() {
                             <td><span className="fw-semibold">{getInitials(item.nama_pelapor || (item.anonim ? 'Anonim' : '-'))}</span></td>
                             <td><span className="fw-semibold">{getInitials(item.nama_korban)}</span> <span className="small text-muted">({item.jenis_kelamin?.charAt(0)})</span></td>
                             <td>
-                              <span className={`badge ${item.tipe_laporan === 'anak' ? 'bg-warning text-dark' : 'bg-info text-dark'}`}>
+                              <span className={`status-pill ${item.tipe_laporan === 'anak' ? 'status-pill-warning' : 'status-pill-info'}`}>
                                 {item.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan'}
                               </span>
                             </td>
@@ -424,14 +523,36 @@ export default function DashboardDP3A() {
             )}
 
             {activeMenu === 'arsip' && (
-              <div className="bento-card">
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h6 className="fw-bold m-0">Arsip Kasus Selesai</h6>
-                  <select className="form-select form-select-sm" style={{ width: '160px' }} value={filterKategori} onChange={e => setFilterKategori(e.target.value)}>
-                    <option value="">Semua Kategori</option>
-                    <option value="anak">Anak</option>
-                    <option value="perempuan">Perempuan</option>
-                  </select>
+              <div className="modern-table-card">
+                {/* Toolbar */}
+                <div className="modern-table-toolbar">
+                  <h6 className="modern-table-title">Arsip Kasus Selesai</h6>
+                  <div className="modern-table-controls">
+                    {/* Search */}
+                    <div className="modern-table-search">
+                      <i className="bi bi-search search-icon"></i>
+                      <input
+                        type="text"
+                        placeholder="Cari arsip..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    {/* Kategori filter pills */}
+                    <div className="filter-pills">
+                      <button className={`filter-pill ${filterKategori === '' ? 'active' : ''}`} onClick={() => setFilterKategori('')}>Semua</button>
+                      <button className={`filter-pill ${filterKategori === 'anak' ? 'active' : ''}`} onClick={() => setFilterKategori('anak')}>Anak</button>
+                      <button className={`filter-pill ${filterKategori === 'perempuan' ? 'active' : ''}`} onClick={() => setFilterKategori('perempuan')}>Perempuan</button>
+                    </div>
+                    {(searchQuery || filterKategori) && (
+                      <button
+                        className="btn btn-sm btn-light text-muted rounded-pill px-3"
+                        onClick={() => { setSearchQuery(''); setFilterKategori(''); }}
+                      >
+                        <i className="bi bi-x-circle me-1"></i>Reset
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {filteredKasSels.length === 0 ? <div className="text-center py-5 text-muted">Arsip kosong</div> : (
                   <div className="table-responsive">
@@ -455,7 +576,7 @@ export default function DashboardDP3A() {
                               <div className="fw-bold">{getInitials(k.nama_korban)}</div>
                             </td>
                             <td>
-                              <span className={`badge ${k.tipe_laporan === 'anak' ? 'bg-warning text-dark' : 'bg-info text-dark'}`}>
+                              <span className={`status-pill ${k.tipe_laporan === 'anak' ? 'status-pill-warning' : 'status-pill-info'}`}>
                                 {k.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan'}
                               </span>
                             </td>
