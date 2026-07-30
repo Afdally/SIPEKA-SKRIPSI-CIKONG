@@ -22,6 +22,8 @@ const {
   bersihkanPilihan,
   bersihkanUsia,
   bersihkanTeksPendek,
+  adaPenandaGender,
+  korbanAdalahPelapor,
   HUBUNGAN_VALID,
   JENIS_KELAMIN_VALID,
 } = require('../services/ekstraksiRule');
@@ -63,7 +65,15 @@ function bersihkanHasilModel(mentah, { masterKekerasan, kronologi, sekarang }) {
     // pelaku. Field itu tetap diminta ke model sebagai tempat pembuangan supaya
     // nama pelaku tidak salah masuk ke nama_korban (lihat SKEMA di ollamaClient).
     usiaKorban:      bersihkanUsia(mentah.usia_korban),
-    jenisKelamin:    bersihkanPilihan(mentah.jenis_kelamin, JENIS_KELAMIN_VALID),
+    // Jawaban model hanya diterima kalau teksnya memang memuat kata yang
+    // menyifati jenis kelamin. Tanpa penjaga ini model mengisi field ini
+    // sekalipun cerita tidak menyebutnya sama sekali — dan jenis kelamin korban
+    // yang salah di laporan kekerasan bukan kesalahan yang murah.
+    // Kalau ditolak, hasil aturan yang dipakai (lihat gabungkan di bawah), yang
+    // masih bisa menyimpulkannya lewat pasangan saat pelapor = korban.
+    jenisKelamin:    adaPenandaGender(kronologi)
+                       ? bersihkanPilihan(mentah.jenis_kelamin, JENIS_KELAMIN_VALID)
+                       : null,
     hubunganKorban:  bersihkanPilihan(mentah.hubungan_pelapor, HUBUNGAN_VALID),
     jenisKekerasan:  bersihkanPilihan(mentah.jenis_kekerasan, masterKekerasan),
     lokasiKejadian:  bersihkanTeksPendek(mentah.lokasi_kejadian),
@@ -127,6 +137,18 @@ exports.analisisKronologi = async (req, res) => {
     });
 
     hasil = gabungkan(bersihkanHasilModel(mentah, { masterKekerasan, kronologi, sekarang }), hasilAturan);
+
+    // Satu-satunya tempat aturan MENGALAHKAN model, bukan sekadar menambal.
+    //
+    // Kalau cerita menyatakan kekerasannya mengarah ke pelapor sendiri ("...
+    // melakukan hal tidak senonoh ke saya"), itu penanda eksplisit dan tidak
+    // ambigu. Model 3B justru sering tersesat di kalimat begini: kerabat yang
+    // disebut sebagai pelaku dibacanya sebagai korban, lalu hubungannya
+    // dijawab "Orang Tua" padahal pelapornya sendiri yang jadi korban.
+    if (korbanAdalahPelapor(kronologi)) {
+      hasil.hubunganKorban = 'Diri Sendiri';
+    }
+
     sumber = 'model';
     model = namaModel;
     durasiMs = durasi;

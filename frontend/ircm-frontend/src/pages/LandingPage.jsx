@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import laporanService from '../services/laporanService';
 import CeritaKejadianStep from '../components/landing/CeritaKejadianStep';
+import { beriTahuGagal, beriTahuKurang, toastSukses } from '../utils/notifikasi';
 import './Public.css';
 import logo from '../assets/logo.png';
 
@@ -99,20 +100,6 @@ export default function LandingPage() {
     setShowCeritaStep(false);
   };
 
-  // Dipanggil kalau pelapor memilih lewati AI dan isi form manual dari awal
-  const handleSkipCerita = ({ kronologi, telepon, preferensi, setuju }) => {
-    setFormData(prev => ({
-      ...prev,
-      kronologi,
-      teleponPelapor: telepon || prev.teleponPelapor,
-    }));
-    setFieldTerisiOtomatis([]);
-    setPreferensiLayanan(preferensi);
-    setPernyataanBenar(setuju);
-    setAutoFillNotice(null);
-    setShowCeritaStep(false);
-  };
-
   const handleCekStatus = async (e) => {
     e.preventDefault();
     if (!kodeLaporan) return;
@@ -132,11 +119,11 @@ export default function LandingPage() {
   // (CeritaKejadianStep), jadi submit di sini langsung jalan tanpa modal lagi.
   const handleSubmitLaporan = async (e) => {
     e.preventDefault();
-    if (formData.kronologi.length < 50) return alert('Kronologi minimal 50 karakter');
+    if (formData.kronologi.length < 50) return beriTahuKurang('Kronologi minimal 50 karakter.');
 
     const usiaCek = parseInt(formData.usiaKorban);
     if (usiaCek < 18 && isAnonim) {
-      return alert('Untuk korban anak-anak (di bawah 18 tahun), laporan wajib mencantumkan identitas pelapor/wali.');
+      return beriTahuKurang('Untuk korban anak-anak (di bawah 18 tahun), laporan wajib mencantumkan identitas pelapor/wali.');
     }
 
     setLoadingSubmit(true);
@@ -175,7 +162,7 @@ export default function LandingPage() {
       const res = await laporanService.submitLaporan(fd);
       setSubmitResult(res.kode_laporan || res?.data?.kode_laporan);
     } catch (err) {
-      alert('Gagal: ' + (err.response?.data?.message || err.message));
+      beriTahuGagal(err.response?.data?.message || err.message, 'Laporan gagal dikirim');
     } finally {
       setLoadingSubmit(false);
     }
@@ -183,7 +170,7 @@ export default function LandingPage() {
 
   const copyKode = () => {
     navigator.clipboard.writeText(submitResult);
-    alert('Kode Laporan disalin!');
+    toastSukses('Kode laporan disalin');
   };
 
   return (
@@ -337,13 +324,12 @@ export default function LandingPage() {
               </div>
             )}
 
-            {/* TAB LAPOR - Langkah 1: Cerita bebas + auto-fill AI (mock, lihat nlpService.js) */}
+            {/* TAB LAPOR - Langkah 1: Cerita bebas + auto-isi lewat nlpService */}
             {activeTab === 'lapor' && !submitResult && showCeritaStep && (
               <CeritaKejadianStep
                 masterKekerasan={masterKekerasan}
                 teleponAwal={formData.teleponPelapor}
                 onSelesai={handleCeritaSelesai}
-                onSkip={handleSkipCerita}
               />
             )}
 

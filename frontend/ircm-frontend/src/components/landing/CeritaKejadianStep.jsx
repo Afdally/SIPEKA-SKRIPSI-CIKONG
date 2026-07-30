@@ -25,7 +25,7 @@ const PREFERENSI_OPTIONS = [
 // (3) pernyataan kebenaran laporan — dasar pertanggungjawaban, sekaligus
 //     penyaring ringan laporan iseng tanpa mempersulit korban asli.
 // Kalau AI-nya gagal/tidak tersedia, pelapor tetap bisa lanjut isi form manual.
-export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSelesai, onSkip }) {
+export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSelesai }) {
   const [kronologi, setKronologi] = useState('');
   const [telepon, setTelepon] = useState(teleponAwal || '');
   const [preferensi, setPreferensi] = useState('');
@@ -34,8 +34,6 @@ export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSel
   const [error, setError] = useState('');
   const [simulasikanGagal, setSimulasikanGagal] = useState(false);
 
-  // Validasi yang sama dipakai tombol "Analisis AI" maupun "Lewati, isi manual",
-  // supaya tidak ada jalur yang bisa melewati pernyataan kesediaan.
   const validasi = () => {
     if (kronologi.trim().length < 50) {
       return 'Ceritakan kejadiannya minimal 50 huruf supaya bisa ditindaklanjuti dengan baik.';
@@ -70,13 +68,6 @@ export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSel
     } finally {
       setAnalyzing(false);
     }
-  };
-
-  const handleSkip = () => {
-    const pesanError = validasi();
-    if (pesanError) { setError(pesanError); return; }
-    setError('');
-    onSkip({ kronologi, telepon, preferensi, setuju });
   };
 
   return (
@@ -176,12 +167,9 @@ export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSel
             </div>
           </div>
         ) : (
-          <div className="d-flex flex-column flex-sm-row gap-2">
+          <div className="d-flex">
             <button type="submit" className="btn btn-primary fw-bold py-2 px-4 rounded-3 flex-fill">
-              <i className="bi bi-stars me-2"></i> Analisis Otomatis dengan AI
-            </button>
-            <button type="button" className="btn btn-outline-secondary fw-bold py-2 px-4 rounded-3" onClick={handleSkip}>
-              Lewati, isi manual
+              <i className="bi bi-stars me-2"></i> Submit
             </button>
           </div>
         )}

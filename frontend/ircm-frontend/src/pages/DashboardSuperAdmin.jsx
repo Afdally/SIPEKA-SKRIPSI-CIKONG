@@ -9,6 +9,7 @@ import StatCard from '../components/dashboard/StatCard';
 import JenisKasusChart from '../components/dashboard/JenisKasusChart';
 import DemografiChart from '../components/dashboard/DemografiChart';
 import ActivityFeed from '../components/dashboard/ActivityFeed';
+import { beriTahuGagal, beriTahuKurang, konfirmasi } from '../utils/notifikasi';
 import './Dashboard.css';
 
 // Status mentah di database -> label yang layak dibaca petugas/pimpinan.
@@ -137,8 +138,8 @@ export default function DashboardSuperAdmin() {
     fetchAll(tok);
   }, [navigate, fetchAll]);
 
-  const handleLogout = () => {
-    if (!window.confirm('Keluar dari Super Admin?')) return;
+  const handleLogout = async () => {
+    if (!await konfirmasi('Keluar dari Super Admin?', { teksSetuju: 'Ya, keluar' })) return;
     localStorage.clear();
     navigate('/login');
   };
@@ -158,16 +159,17 @@ export default function DashboardSuperAdmin() {
       setShowUserModal(false);
       fetchUsers(getToken());
     } catch (err) {
-      alert(err.response?.data?.message || 'Error saving user');
+      beriTahuGagal(err.response?.data?.message || 'Akun petugas gagal disimpan.');
     }
   };
 
   const deleteUser = async (id) => {
-    if (!window.confirm('Yakin hapus akun petugas ini?')) return;
+    const setuju = await konfirmasi('Akun petugas ini akan dihapus permanen.', { judul: 'Hapus akun petugas?', teksSetuju: 'Ya, hapus', berbahaya: true });
+    if (!setuju) return;
     try {
       await authService.deleteUser(getToken(), id);
       fetchUsers(getToken());
-    } catch (err) { alert(err.response?.data?.message || 'Error'); }
+    } catch (err) { beriTahuGagal(err.response?.data?.message || 'Terjadi kesalahan pada sistem.'); }
   };
 
   const openUserModal = (u = null) => {
@@ -196,18 +198,19 @@ export default function DashboardSuperAdmin() {
       setShowMasterModal(false);
       fetchMaster(tok);
     } catch (err) {
-      alert(err.response?.data?.message || 'Error saving master data');
+      beriTahuGagal(err.response?.data?.message || 'Data master gagal disimpan.');
     }
   };
 
   const deleteMaster = async (type, id) => {
-    if (!window.confirm('Yakin hapus data master ini? Bisa berdampak pada history.')) return;
+    const setuju = await konfirmasi('Data ini dipakai laporan lama, menghapusnya bisa berdampak pada riwayat kasus.', { judul: 'Hapus data master?', teksSetuju: 'Ya, hapus', berbahaya: true });
+    if (!setuju) return;
     try {
       const tok = getToken();
       if (type === 'kekerasan') await laporanService.deleteMasterKekerasan(tok, id);
       else await kasusService.deleteMasterMetode(tok, id);
       fetchMaster(tok);
-    } catch (err) { alert(err.response?.data?.message || 'Error'); }
+    } catch (err) { beriTahuGagal(err.response?.data?.message || 'Terjadi kesalahan pada sistem.'); }
   };
 
   const openMasterModal = (type, item = null) => {
@@ -261,7 +264,7 @@ export default function DashboardSuperAdmin() {
   // difilter. Yang diekspor adalah data hasil filter yang sedang tampil.
   const handleExportExcel = async () => {
     const data = getFilteredReports();
-    if (data.length === 0) return alert('Tidak ada data untuk diekspor!');
+    if (data.length === 0) return beriTahuKurang('Tidak ada data untuk diekspor.');
 
     const headerRow = EXPORT_COLUMNS.map(col => ({
       value: col.header,
@@ -299,7 +302,7 @@ export default function DashboardSuperAdmin() {
         stickyRowsCount: 1, // baris judul tetap terlihat saat digulir
       }).toFile(`Data_Pelaporan_${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (err) {
-      alert('Gagal membuat file Excel: ' + err.message);
+      beriTahuGagal(err.message, 'Gagal membuat file Excel');
     } finally {
       setExporting(false);
     }

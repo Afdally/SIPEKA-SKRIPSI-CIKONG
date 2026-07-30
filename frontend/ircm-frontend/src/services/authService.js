@@ -1,6 +1,8 @@
 import axios from 'axios'
 
-const BASE_URL = import.meta.env.VITE_AUTH_SERVICE_URL || 'http://localhost:8080/api'
+// Relatif, sama alasannya dengan apiClient.js: alamat backend diurus proxy
+// Vite supaya bisa diakses dari perangkat mana pun.
+const BASE_URL = import.meta.env.VITE_AUTH_SERVICE_URL || '/api'
 
 const api = axios.create({
   baseURL: BASE_URL,

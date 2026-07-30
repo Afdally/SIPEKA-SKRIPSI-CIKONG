@@ -6,6 +6,7 @@ import kasusService from '../services/kasusService';
 import StatCard from '../components/dashboard/StatCard';
 import JenisKasusChart from '../components/dashboard/JenisKasusChart';
 import DemografiChart from '../components/dashboard/DemografiChart';
+import { beriTahuGagal, beriTahuKurang, konfirmasi } from '../utils/notifikasi';
 import './Dashboard.css';
 
 const METODE_LIST = ['Konsultasi / Mediasi', 'Psikososial', 'Bantuan Hukum'];
@@ -88,8 +89,8 @@ export default function DashboardDP3A() {
     fetchAll(tok);
   }, [navigate, fetchAll]);
 
-  const handleLogout = () => {
-    if (!window.confirm('Keluar dari dashboard?')) return;
+  const handleLogout = async () => {
+    if (!await konfirmasi('Keluar dari dashboard?', { teksSetuju: 'Ya, keluar' })) return;
     localStorage.clear();
     navigate('/login');
   };
@@ -98,7 +99,7 @@ export default function DashboardDP3A() {
   // Tahap 1 (registrasi) -> 2 (assessment) -> 3 (intervensi) -> 4 (monitoring/selesai)
 
   const submitRegistrasi = async () => {
-    if (!pesanTindakLanjut) return alert('Pesan tindak lanjut wajib diisi');
+    if (!pesanTindakLanjut) return beriTahuKurang('Pesan tindak lanjut wajib diisi');
     setSubmitting(true);
     try {
       await kasusService.registrasi(getToken(), {
@@ -109,14 +110,14 @@ export default function DashboardDP3A() {
       setViewMode('list');
       fetchAll();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error');
+      beriTahuGagal(err.response?.data?.message || 'Terjadi kesalahan pada sistem.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const submitAssessment = async () => {
-    if (!hasilAssessment) return alert('Hasil assessment wajib diisi');
+    if (!hasilAssessment) return beriTahuKurang('Hasil assessment wajib diisi');
     setSubmitting(true);
     try {
       await kasusService.assessment(getToken(), selectedItem._id, {
@@ -127,14 +128,14 @@ export default function DashboardDP3A() {
       setViewMode('list');
       fetchAll();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error');
+      beriTahuGagal(err.response?.data?.message || 'Terjadi kesalahan pada sistem.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const submitIntervensi = async () => {
-    if (!metode) return alert('Metode wajib dipilih');
+    if (!metode) return beriTahuKurang('Metode wajib dipilih');
     setSubmitting(true);
     try {
       await kasusService.intervensi(getToken(), selectedItem._id, {
@@ -144,34 +145,38 @@ export default function DashboardDP3A() {
       setViewMode('list');
       fetchAll();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error');
+      beriTahuGagal(err.response?.data?.message || 'Terjadi kesalahan pada sistem.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const submitLog = async () => {
-    if (!catatanLog) return alert('Catatan log wajib diisi');
+    if (!catatanLog) return beriTahuKurang('Catatan log wajib diisi');
     setSubmitting(true);
     try {
       await kasusService.addLog(getToken(), selectedItem._id, { catatan: catatanLog });
       setViewMode('list');
       fetchAll();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error');
+      beriTahuGagal(err.response?.data?.message || 'Terjadi kesalahan pada sistem.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const selesaikanKasus = async () => {
-    if (!window.confirm('Yakin ingin menutup kasus ini? Kasus akan diarsipkan dan tidak bisa diubah lagi.')) return;
+    const setuju = await konfirmasi(
+      'Kasus akan diarsipkan dan tidak bisa diubah lagi.',
+      { judul: 'Tutup kasus ini?', teksSetuju: 'Ya, tutup kasus', berbahaya: true },
+    );
+    if (!setuju) return;
     try {
       await kasusService.selesaikan(getToken(), selectedItem._id);
       setViewMode('list');
       fetchAll();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error');
+      beriTahuGagal(err.response?.data?.message || 'Terjadi kesalahan pada sistem.');
     }
   };
 
@@ -710,19 +715,19 @@ export default function DashboardDP3A() {
                         ) : (
                           <div className="mt-2 border rounded p-2 bg-light text-center">
                             {detailData.bukti_file.toLowerCase().match(/\.(jpeg|jpg|gif|png)$/) ? (
-                              <a href={`http://localhost:8080/${detailData.bukti_file}`} target="_blank" rel="noreferrer">
-                                <img src={`http://localhost:8080/${detailData.bukti_file}`} alt="Bukti Terlampir" className="img-fluid rounded border" style={{ maxHeight: '300px', objectFit: 'contain' }} />
+                              <a href={`/${detailData.bukti_file}`} target="_blank" rel="noreferrer">
+                                <img src={`/${detailData.bukti_file}`} alt="Bukti Terlampir" className="img-fluid rounded border" style={{ maxHeight: '300px', objectFit: 'contain' }} />
                               </a>
                             ) : detailData.bukti_file.toLowerCase().endsWith('.pdf') ? (
                               <div className="d-flex align-items-center justify-content-center gap-3 p-3">
                                 <i className="bi bi-file-earmark-pdf-fill text-danger" style={{ fontSize: '3rem' }}></i>
                                 <div className="text-start">
-                                  <a href={`http://localhost:8080/${detailData.bukti_file}`} target="_blank" rel="noreferrer" className="fw-bold text-primary text-decoration-none d-block fs-5">Lihat Dokumen PDF</a>
+                                  <a href={`/${detailData.bukti_file}`} target="_blank" rel="noreferrer" className="fw-bold text-primary text-decoration-none d-block fs-5">Lihat Dokumen PDF</a>
                                   <small className="text-muted">{detailData.bukti_file.split('/').pop()}</small>
                                 </div>
                               </div>
                             ) : (
-                              <a href={`http://localhost:8080/${detailData.bukti_file}`} target="_blank" rel="noreferrer" className="btn btn-outline-primary fw-semibold mt-2"><i className="bi bi-file-earmark-arrow-down me-2"></i> Unduh File Lampiran</a>
+                              <a href={`/${detailData.bukti_file}`} target="_blank" rel="noreferrer" className="btn btn-outline-primary fw-semibold mt-2"><i className="bi bi-file-earmark-arrow-down me-2"></i> Unduh File Lampiran</a>
                             )}
                           </div>
                         )}

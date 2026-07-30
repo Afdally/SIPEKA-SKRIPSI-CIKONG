@@ -15,9 +15,35 @@ const HUBUNGAN_VALID = ['Orang Tua', 'Anak', 'Saudara', 'Suami/Istri', 'Tetangga
 const JENIS_KELAMIN_VALID = ['Laki-laki', 'Perempuan'];
 
 // Kata yang sering dikira nama oleh model, padahal bukan.
+//
+// Sebutan kerabat mendominasi daftar ini karena itulah kekeliruan yang paling
+// sering terjadi: pelapor menulis "adek saya dipukuli", tidak menyebut nama
+// siapa pun, lalu model mengisi nama_korban dengan "adek". Kalau lolos, kata
+// itu masuk ke formulir sebagai nama korban dan ikut tersimpan sebagai data
+// resmi.
 const BUKAN_NAMA = new Set([
-  'sa','s','ak','saya', 'aku', 'dia', 'ia', 'kami', 'korban', 'pelaku', 'anak', 'anaknya',
-  'ibu', 'ayah', 'suami', 'istri', 'tidak', 'tidak ada', 'tidak disebutkan', '-',
+  // kata ganti & peran
+  'sa', 's', 'ak', 'saya', 'aku', 'dia', 'ia', 'kami', 'kita', 'beliau',
+  'korban', 'pelaku', 'pelapor', 'terlapor', 'saksi',
+  // kerabat & orang dekat
+  'anak', 'anaknya', 'anak kandung', 'anak tiri', 'anak angkat',
+  'ibu', 'ibu tiri', 'ibu kandung', 'mama', 'bunda', 'emak',
+  'ayah', 'ayah tiri', 'ayah kandung', 'bapak', 'papa', 'abah',
+  'orang tua', 'ortu', 'suami', 'istri', 'pasangan', 'pacar', 'mantan',
+  'adik', 'adek', 'kakak', 'kak', 'abang', 'bang', 'saudara', 'saudari',
+  'sepupu', 'kembaran', 'nenek', 'kakek', 'paman', 'om', 'bibi', 'tante',
+  'keponakan', 'ponakan', 'cucu', 'menantu', 'mertua', 'ipar',
+  'tetangga', 'teman', 'sahabat', 'guru', 'murid', 'atasan', 'majikan',
+  // kata kerja & kata umum yang sering tersangkut jadi "nama" pada laporan
+  // pendek tanpa nama sama sekali — model kecil cenderung tetap mengisi field
+  // daripada mengosongkannya, dan yang diambil biasanya kata di dekat "saya".
+  'lihat', 'melihat', 'dilihat', 'lapor', 'melapor', 'melaporkan', 'cerita',
+  'kejadian', 'kekerasan', 'peristiwa', 'masalah', 'kasus',
+  'rumah', 'sekolah', 'kos', 'kamar', 'tempat',
+  'malam', 'pagi', 'siang', 'sore', 'tadi', 'kemarin', 'sekarang',
+  // penanda "tidak ada isinya"
+  'tidak', 'tidak ada', 'tidak diketahui', 'tidak disebutkan', 'tidak disebut',
+  'kosong', 'null', 'none', 'n/a', '-', '--',
 ]);
 
 const BULAN = {
@@ -99,15 +125,6 @@ function tebakUsia(teksAsli) {
   return null;
 }
 
-// ─── Jenis kelamin ───
-
-function tebakJenisKelamin(teks) {
-  const t = normalisasiTeks(teks);
-  if (/\b(perempuan|wanita|istri|ibu|putri|anak perempuan|gadis)\b/.test(t)) return 'Perempuan';
-  if (/\b(laki-laki|lelaki|pria|suami|putra|anak laki-laki)\b/.test(t)) return 'Laki-laki';
-  return null;
-}
-
 // ─── Hubungan pelapor dengan korban ───
 
 // Menebak hubungan pelapor dengan KORBAN — pelapor sering bukan korbannya.
@@ -137,6 +154,31 @@ const KATA_KEKERASAN = /(pukul|tampar|tendang|ancam|leceh|paksa|aniaya|hina|ceki
 // Diuji terhadap potongan teks TEPAT SEBELUM sebutan kerabat.
 const PENANDA_PELAKU = /(?:\boleh|\bsama|\bdari|\w*(?:pukul|tampar|tendang|leceh|aniaya|ancam|hina|bentak|cabul|perkosa|cekik)\w*)\s+$/;
 
+// Pasangan dari PENANDA_PELAKU untuk kalimat AKTIF, diuji ke potongan teks TEPAT
+// SESUDAH sebutan kerabat: "istri saya sering mengancam saya".
+//
+// Perlu keduanya karena letak pelaku berpindah mengikuti bentuk kalimat:
+//   pasif  "saya diancam oleh istri saya"      -> pelaku SESUDAH kata kekerasan
+//   aktif  "istri saya sering mengancam saya"  -> pelaku SEBELUM kata kekerasan
+// PENANDA_PELAKU hanya melihat ke belakang, jadi tanpa ini pelaku dalam kalimat
+// aktif terbaca sebagai korban.
+//
+// Bentuk aktifnya ditulis utuh (bukan kata dasar + awalan) karena imbuhan meN-
+// meluluhkan huruf pertama: pukul->memukul, tampar->menampar. Mencocokkan kata
+// dasar tidak akan kena.
+//
+// Sisipan di tengah dibatasi daftar keterangan, bukan \w+, supaya kalimat seperti
+// "istri saya menangis karena adik memukul" tidak salah dianggap menunjuk pelaku.
+//
+// Kata milik ikut diizinkan di depan karena cariKerabatKorban memanggil ini dua
+// kali: pada lapis longgar (wajibMilik=false) yang tercocok cuma "istri", jadi
+// "saya" masih tersisa di awal potongan.
+const MILIK = '(?:saya|aku|kami|kita|dia|nya|itu|tersebut)';
+const KETERANGAN = '(?:sering|selalu|kerap|suka|terus|sudah|sempat|pernah|kadang|kembali|lagi|juga|sekali|saja|itu|tersebut|yang|bahkan|malah|tiba-tiba)';
+const PENANDA_PELAKU_AKTIF = new RegExp(
+  `^\\s+(?:${MILIK}\\s+)?(?:${KETERANGAN}\\s+){0,3}(?:memukul|menampar|menendang|mengancam|menghina|membentak|melecehkan|menganiaya|mencekik|memperkosa|mencabuli|menelantarkan|memaki|merendahkan|menjambak|membanting|menyeret|meneror|mempermalukan)\\b`
+);
+
 // Cari sebutan kerabat yang berperan sebagai korban. `wajibMilik` = hanya terima
 // bentuk kepemilikan ("adik saya"), yang jauh lebih meyakinkan daripada sebutan
 // telanjang ("adik") karena tidak mungkin tertukar dengan orang lain di cerita.
@@ -148,11 +190,39 @@ function cariKerabatKorban(t, wajibMilik) {
     let cocok;
     while ((cocok = pola.exec(t)) !== null) {
       const sebelum = t.slice(Math.max(0, cocok.index - 24), cocok.index);
-      if (PENANDA_PELAKU.test(sebelum)) continue; // ini pelaku, bukan korban
+      if (PENANDA_PELAKU.test(sebelum)) continue; // pelaku (kalimat pasif)
+
+      const sesudah = t.slice(cocok.index + cocok[0].length, cocok.index + cocok[0].length + 48);
+      if (PENANDA_PELAKU_AKTIF.test(sesudah)) continue; // pelaku (kalimat aktif)
+
       return hubungan;
     }
   }
   return null;
+}
+
+// Kekerasan yang jelas-jelas mengarah ke pelapor sendiri.
+//
+// Diperiksa lebih dulu daripada pencarian kerabat karena penanda ini jauh lebih
+// kuat. Pada "bapakku mabuk dan melakukan hal tidak senonoh ke saya", kerabat
+// yang tersebut (bapak) adalah PELAKU, tapi dia lolos dari kedua penyaring
+// PENANDA_PELAKU: bentuknya aktif, dan kata kerjanya ("mabuk dan melakukan")
+// tidak ada di daftar. Menyandarkan diri pada daftar kata kerja tidak akan
+// pernah lengkap — arah sasarannya ("... ke saya") jauh lebih dapat diandalkan.
+const KEKERASAN_KE_PELAPOR = [
+  // pasif: "saya dipukul", "saya sering ditampar"
+  //
+  // "saya" wajib berada di awal klausa. Tanpa syarat itu, "adik saya dipukuli"
+  // ikut tertangkap — padahal di sana "saya" adalah kata MILIK kepunyaan adik,
+  // bukan sasaran kekerasan, dan korbannya adik.
+  new RegExp(`(?:^|[.,;]\\s*|\\b(?:dan|lalu|kemudian|karena|sedangkan|tapi|tetapi|namun)\\s+)saya\\s+(?:${KETERANGAN}\\s+){0,3}di\\w*(?:pukul|tampar|tendang|leceh|aniaya|ancam|hina|bentak|cabul|perkosa|cekik|maki|paksa|raba)`),
+  // aktif dengan sasaran: "berbuat senonoh ke saya", "mengancam kepada saya"
+  /(?:pukul|tampar|tendang|leceh|senonoh|aniaya|ancam|hina|bentak|cabul|perkosa|cekik|maki|raba)\w*\s+(?:\w+\s+){0,3}?(?:ke|kepada|terhadap|sama)\s+saya\b/,
+];
+
+function korbanAdalahPelapor(teks) {
+  const t = normalisasiTeks(teks);
+  return KEKERASAN_KE_PELAPOR.some(pola => pola.test(t));
 }
 
 function tebakHubungan(teks) {
@@ -161,10 +231,88 @@ function tebakHubungan(teks) {
   // Dua lapis: yang meyakinkan dulu ("adik saya"), baru yang longgar ("adik").
   // Tanpa pemisahan ini, kalimat seperti "tetangga saya seorang ibu ditelantarkan"
   // salah terbaca sebagai "Anak" hanya karena kata "ibu" muncul lebih awal.
-  return cariKerabatKorban(t, true)
+  return (korbanAdalahPelapor(teks) ? 'Diri Sendiri' : null)
+      || cariKerabatKorban(t, true)
       || cariKerabatKorban(t, false)
       // Sisanya: cerita orang pertama tanpa kerabat sebagai korban.
       || (/\bsaya\b/.test(t) && KATA_KEKERASAN.test(t) ? 'Diri Sendiri' : null);
+}
+
+// ─── Jenis kelamin ───
+//
+// Yang dicari jenis kelamin KORBAN — bukan sekadar "ada kata gender di teks".
+// Dalam satu laporan ada sampai tiga orang, jadi memindai seluruh kalimat itu
+// keliru. Pada "adik saya dipukuli oleh ibu saya", kata "ibu" itu PELAKU, dan
+// jenis kelamin adik tidak disebutkan sama sekali.
+//
+// Persoalannya sama dengan yang sudah ditangani cariKerabatKorban di atas —
+// menautkan sebutan ke perannya — jadi penyaring PENANDA_PELAKU yang sama
+// dipakai ulang di sini.
+//
+// Hanya dua sumber yang diterima, selebihnya null. Ini disengaja: di formulir
+// laporan kekerasan, field kosong lebih aman daripada field salah. Yang kosong
+// pasti diisi pelapor; yang telanjur terisi keliru bisa lolos tanpa diperiksa
+// lalu menjadi data resmi.
+
+// Kata yang benar-benar menyifati jenis kelamin ("anak perempuan saya").
+// Sebutan kerabat (ibu/ayah/suami/istri) sengaja TIDAK masuk sini — itu
+// menyatakan hubungan, bukan jenis kelamin korban.
+const GENDER_LANGSUNG = [
+  [/\b(perempuan|wanita|putri|gadis)\b/g, 'Perempuan'],
+  [/\b(laki-laki|lelaki|pria|putra)\b/g, 'Laki-laki'],
+];
+
+// Pasangan -> jenis kelamin PELAPOR. Cuma sah dipakai kalau pelapor memang
+// korbannya sendiri; di luar itu pasangan yang disebut adalah pasangan pelapor
+// dan tidak mengatakan apa pun tentang korban.
+const PASANGAN_KE_GENDER = [
+  [/\bsuami\b/, 'Perempuan'],
+  [/\bistri\b/, 'Laki-laki'],
+];
+
+function tebakJenisKelamin(teks, hubungan = null) {
+  const t = normalisasiTeks(teks);
+
+  // 1. Kata gender yang menempel pada korban, dengan yang menempel pada pelaku
+  //    ("dipukul oleh pria itu") dibuang.
+  for (const [pola, hasil] of GENDER_LANGSUNG) {
+    pola.lastIndex = 0; // pola ber-flag /g dipakai berulang; indeksnya harus direset
+    let cocok;
+    while ((cocok = pola.exec(t)) !== null) {
+      const sebelum = t.slice(Math.max(0, cocok.index - 24), cocok.index);
+      if (PENANDA_PELAKU.test(sebelum)) continue;
+      return hasil;
+    }
+  }
+
+  // 2. Penyimpulan lewat pasangan — hanya saat pelapor adalah korbannya sendiri.
+  //    Mengandaikan pasangan lawan jenis: asumsi yang memadai untuk isian yang
+  //    masih dikoreksi pelapor, tapi jangan diperluas melampaui kondisi ini.
+  if (hubungan === 'Diri Sendiri') {
+    for (const [pola, hasil] of PASANGAN_KE_GENDER) {
+      if (pola.test(t)) return hasil;
+    }
+  }
+
+  return null;
+}
+
+// Apakah teks memuat kata yang benar-benar menyifati jenis kelamin?
+//
+// Dipakai analisisController untuk menolak jawaban model yang tidak berpijak
+// pada teks. Model kecil cenderung tetap mengisi field daripada mengosongkannya:
+// pada laporan yang sama sekali tidak menyebut jenis kelamin, qwen2.5:3b masih
+// menjawab "Perempuan" — kemungkinan karena mayoritas contoh laporan kekerasan
+// memang begitu. Tebakan semacam itu tidak boleh masuk formulir.
+//
+// Sebutan kerabat sengaja tidak dihitung: "bapakku" memberi tahu jenis kelamin
+// PELAKU, bukan korban.
+function adaPenandaGender(teks) {
+  const t = normalisasiTeks(teks);
+  return GENDER_LANGSUNG.some(([pola]) => {
+    pola.lastIndex = 0; // pola ber-flag /g; test() memajukan lastIndex
+    return pola.test(t);
+  });
 }
 
 // ─── Jenis kekerasan ───
@@ -174,7 +322,12 @@ function tebakHubungan(teks) {
 const KAMUS_KEKERASAN = {
   // 'leceh' dipakai sebagai kata dasar supaya sekaligus menangkap
   // "pelecehan", "dilecehkan", dan "melecehkan".
-  'Kekerasan Seksual': ['leceh', 'perkosa', 'seksual', 'dipaksa berhubungan', 'diremas', 'cabul'],
+  // 'senonoh' menangkap "hal tidak senonoh" / "berbuat senonoh" — ungkapan halus
+  // yang justru paling sering dipakai pelapor untuk kekerasan seksual, karena
+  // menyebutnya secara langsung terasa berat. Tanpa ini laporan seperti itu
+  // hanya tertangkap lewat kata "trauma" dan salah masuk ke Kekerasan Psikis.
+  'Kekerasan Seksual': ['leceh', 'perkosa', 'seksual', 'dipaksa berhubungan', 'diremas', 'cabul',
+                        'senonoh', 'digagahi', 'disetubuhi', 'ditelanjangi', 'diraba'],
   'Kekerasan Fisik':   ['pukul', 'tampar', 'tendang', 'lempar', 'cekik', 'seret', 'dianiaya', 'jambak', 'dibanting'],
   'Kekerasan Psikis':  ['ancam', 'bentak', 'hina', 'trauma', 'teror', 'dipermalukan', 'dimaki', 'direndahkan'],
   'Penelantaran':      ['telantar', 'tidak diberi makan', 'ditinggal', 'diabaikan', 'tidak dinafkahi'],
@@ -236,12 +389,25 @@ function konversiTanggal(frasa, sekarang = new Date()) {
     return format(d);
   };
 
-  if (/\b(hari ini|tadi|baru saja|sekarang)\b/.test(t)) return format(hariIni);
+  // "tadi malam" dan "semalam" menunjuk malam KEMARIN, bukan hari ini. Harus
+  // diperiksa lebih dulu: aturan \btadi\b di bawah akan menangkap "tadi malam"
+  // dan memajukan kejadiannya sehari. Beda dengan "tadi pagi"/"tadi sore" yang
+  // memang hari ini.
+  if (/\b(tadi malam|semalam|semalem|kemarin malam)\b/.test(t)) return geserHari(1);
+
+  if (/\b(hari ini|tadi|baru saja|barusan|sekarang)\b/.test(t)) return format(hariIni);
   if (/\bkemarin\s+(lusa|dulu)\b/.test(t)) return geserHari(2);
   if (/\bkemarin\b/.test(t)) return geserHari(1);
 
-  // "3 hari lalu", "dua minggu yang lalu", "sejak 3 bulan terakhir"
-  const relatif = t.match(/(\d+|se|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s*(hari|minggu|bulan|tahun)\s*(?:yang\s*)?(?:lalu|terakhir|belakangan)/);
+  // "3 hari lalu", "dua minggu yang lalu", "sejak 3 bulan terakhir", "minggu lalu"
+  //
+  // Jumlahnya opsional karena pelapor sering menghilangkannya ("minggu lalu",
+  // "bulan lalu"); tanpa itu frasa yang sangat umum ini tidak terbaca sama sekali.
+  //
+  // Tapi jumlah yang KABUR ("beberapa bulan terakhir") tetap ditolak lewat
+  // lookbehind: memakai nilai bawaan 1 di situ bukan membaca, melainkan menebak,
+  // dan tebakannya justru memperpendek rentang kejadian yang sebenarnya panjang.
+  const relatif = t.match(/(?<!\b(?:beberapa|bbrp|banyak|sekian|byk)\s)(?:(\d+|se|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s*)?(hari|minggu|bulan|tahun)\s*(?:yang\s*)?(?:lalu|terakhir|belakangan)/);
   if (relatif) {
     const angkaKata = { se: 1, satu: 1, dua: 2, tiga: 3, empat: 4, lima: 5, enam: 6, tujuh: 7, delapan: 8, sembilan: 9, sepuluh: 10 };
     const n = /^\d+$/.test(relatif[1]) ? Number(relatif[1]) : (angkaKata[relatif[1]] || 1);
@@ -279,9 +445,19 @@ function bersihkanNama(nilai) {
   if (!nilai) return null;
   const s = String(nilai).trim();
   if (!s || s.length > 60) return null;
-  if (BUKAN_NAMA.has(s.toLowerCase())) return null;
+
   // Nama tidak mungkin berisi angka
   if (/\d/.test(s)) return null;
+
+  // Inisial satu huruf ("adek s dipukuli") bukan nama yang bisa dipakai —
+  // ini yang dijanjikan ke model lewat contoh few-shot di ollamaClient.
+  if (s.replace(/[^a-zA-Z]/g, '').length < 2) return null;
+
+  // Kata milik yang ikut terbawa dibuang dulu, supaya "adik saya" tetap
+  // tersaring oleh daftar di bawah dan tidak lolos hanya karena ada "saya".
+  const inti = s.toLowerCase().replace(/\s+(saya|aku|kami|kita|nya|itu|tersebut)$/, '').trim();
+  if (BUKAN_NAMA.has(inti)) return null;
+
   return s;
 }
 
@@ -307,6 +483,10 @@ function bersihkanTeksPendek(nilai, maks = 120) {
 // ─── Ekstraksi lengkap tanpa model ───
 
 function ekstrakDenganAturan(kronologi, { masterKekerasan = [], sekarang = new Date() } = {}) {
+  // Dihitung lebih dulu karena jenis kelamin ikut bergantung padanya
+  // (lihat tebakJenisKelamin).
+  const hubungan = tebakHubungan(kronologi);
+
   return {
     // Nama tidak diambil dengan regex — terlalu rawan salah. Dua kunci ini tetap
     // ada supaya bentuk objeknya sama dengan hasil model (lihat gabungkan()
@@ -314,8 +494,8 @@ function ekstrakDenganAturan(kronologi, { masterKekerasan = [], sekarang = new D
     namaKorban:       null,
     namaPelapor:      null,
     usiaKorban:       tebakUsia(kronologi),
-    jenisKelamin:     tebakJenisKelamin(kronologi),
-    hubunganKorban:   tebakHubungan(kronologi),
+    jenisKelamin:     tebakJenisKelamin(kronologi, hubungan),
+    hubunganKorban:   hubungan,
     jenisKekerasan:   tebakJenisKekerasan(kronologi, masterKekerasan),
     kelurahanKorban:  cocokkanKelurahan(kronologi),
     lokasiKejadian:   null, // butuh pemahaman kalimat — serahkan ke model
@@ -330,7 +510,9 @@ module.exports = {
   cocokkanKelurahan,
   tebakUsia,
   tebakJenisKelamin,
+  adaPenandaGender,
   tebakHubungan,
+  korbanAdalahPelapor,
   tebakJenisKekerasan,
   bersihkanNama,
   bersihkanPilihan,
