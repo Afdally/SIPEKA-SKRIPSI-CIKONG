@@ -27,7 +27,11 @@ const laporanSchema = new mongoose.Schema({
   longitude:        { type: Number, default: null }, // Koordinat peta
   kronologi:        { type: String, required: true },
   bukti_file:       { type: String, default: null },
+
+  // Dikonfirmasi pelapor di langkah awal form pelaporan:
+  // cara pertemuan yang diinginkan + pernyataan bahwa laporan benar.
   preferensi_layanan: { type: String, default: 'Datang ke UPTD' },
+  pernyataan_benar:   { type: Boolean, default: false },
   
   // Status
   status:           { type: String, default: 'menunggu_registrasi' },

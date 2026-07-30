@@ -171,17 +171,98 @@ Microservices". Judul baru hasil revisi (Bahasa Indonesia penuh):
    integrasi data untuk skripsi GIS milik rekan satu tim, BUKAN kontribusi thesis ini.
    Jangan ditulis sebagai novelty di proposal/BAB IV-V.
 
-## Yang Masih Ditunda (menunggu data lapangan)
+## HASIL WAWANCARA LAPANGAN (2026-07-26) — PENTING, MENGUBAH ARAH KLAIM
 
-Wawancara ke DPPPA Kota Kendari perlu dilakukan dulu sebelum finalisasi detail revisi.
-Form wawancara sudah dibuat: `Instrumen_Wawancara_DPPPA_Kendari_v2.docx` (folder Downloads),
-isinya konfirmasi soal:
-- Struktur organisasi/bidang yang terlibat (menentukan relevansi microservices per-bidang)
-- Volume laporan riil per minggu/bulan
-- Kewajiban integrasi ke Simfoni PPA
-- Rencana replikasi/scale-up ke depan
-- Kesiapan infrastruktur (server/hosting, siapa yang maintain pasca-skripsi)
+Wawancara SUDAH dilakukan. Narasumber: **Hizal Joisman SP, Kepala UPTD PPA Kota Kendari**.
+File terisi: `Instrumen_Wawancara_DPPPA_Kendari_v2.docx` (folder Downloads).
+Ada juga data wawancara rekan satu tim (skripsi GIS/K-Means) dengan narasumber yang sama,
+Mei 2026, file `Wawancara ... K-Means Clustering (Jawaban).xlsx` di Downloads.
 
-Hasil wawancara ini bisa mengubah detail implementasi RabbitMQ/microservices di atas.
-Setelah wawancara + revisi website selesai, rencana selanjutnya: user testing di DPPPA,
-baru proposal disusun ulang jadi draft skripsi (BAB IV-V).
+### Temuan yang MEMATAHKAN justifikasi microservices berbasis kebutuhan
+
+- **Tidak ada pembagian bidang.** "Yang mengurus laporan dari awal sampai akhir itu UPTD,
+  bukan DPPPA. Tidak ada bidang khusus di UPTD karena kekurangan orang, jadi semua pegawai
+  di UPTD adalah petugas layanan." Total 9 orang (2 tenaga ahli); alur ditangani satu tim
+  yang sama (2 konselor + 2 tenaga pembantu).
+- **Independensi antarbidang: "Tidak ada."** Ini jawaban langsung atas pertanyaan kunci
+  untuk business-capability decomposition — dan jawabannya negatif.
+- **Volume: ±10 laporan per BULAN** (lebih kecil dari asumsi awal "beberapa per minggu").
+- **Tidak pernah ada lonjakan laporan serentak.**
+- **Kelurahan tidak perlu akun sendiri** — "tidak perlu karena akan semakin banyak
+  birokrasinya". Menandai laporan rujukan kelurahan juga ditolak dengan alasan sama.
+  → argumen "siap skala lewat perluasan ke kelurahan" ikut gugur.
+- Ada tren peningkatan tahun ke tahun (organik, karena layanan makin dikenal), tapi
+  bukan lonjakan.
+
+### Temuan yang sempat dikira peluang, TAPI juga gugur
+
+- **Simfoni PPA: wajib, real-time saat kasus ditutup, mekanisme sekarang INPUT MANUAL.**
+  Sempat dikira ini landasan baru (integrasi asinkron ke sistem eksternal = use case sah
+  untuk message broker). **TAPI user sudah cek: Simfoni PPA tidak menyediakan API.**
+  Pihak UPTD juga tidak tahu (bukan orang IT). Tanpa API, yang realistis dibangun hanya
+  penyiapan data siap-salin/ekspor — dan sistem sudah punya ekspor Excel (kebutuhan
+  fungsional #11). **Jadi ini TIDAK bisa dipakai membenarkan arsitektur apa pun.**
+  Masih layak dibangun sebagai fitur praktis (kurangi input dobel), bukan sebagai novelty.
+  Belum dicek ke DPPPA level dinas / Diskominfo — masih layak ditanyakan, tapi jangan
+  jadi penghalang pekerjaan lain.
+
+### Temuan operasional lain
+
+- **Hosting: Diskominfo** (dikonfirmasi juga oleh Bu Kadis sebelumnya). DPPPA/UPTD tidak
+  punya server sendiri.
+- **Maintenance pasca-skripsi: pihak ketiga**, tidak ada staf IT internal. → perlu diakui
+  jujur sebagai keterbatasan di BAB V, karena Docker + multi-container + message broker
+  menuntut kompetensi operasional yang tidak sederhana.
+- **Studi kasus sebenarnya UPTD PPA, bukan DPPPA.** Judul & seluruh proposal menyebut
+  DPPPA, padahal pelaksana operasional penanganan kasus adalah UPTD PPA (unit di bawah
+  DPPPA). Perlu diluruskan bersama pembimbing.
+- Alur kerja riil ada **7 tahap** (dari data wawancara rekan): pengaduan/penjangkauan →
+  registrasi → assesmen → rencana intervensi → intervensi layanan → monitoring →
+  terminasi. Lebih detail dari alur 5 status yang ada di sistem sekarang.
+- Kelurahan kadang menangani & mendampingi korban sampai selesai sendiri; minta bantuan
+  UPTD hanya untuk fasilitasi kebutuhan khusus (bantuan hukum, kesehatan).
+- Pertanyaan terbuka "kebutuhan lain di luar sistem ini?" dijawab: **"Untuk saat ini tidak
+  ada."**
+
+## FRAMING BARU YANG DIUSULKAN (belum disetujui pembimbing)
+
+**Kesimpulan jujur dari data di atas: tidak ada satu pun kebutuhan riil UPTD/DPPPA yang
+menuntut arsitektur microservices.** Bukan dari pembagian bidang, bukan dari volume,
+bukan dari integrasi.
+
+Solusinya BUKAN mengubah kode, tapi mengubah **jenis klaim penelitian**:
+
+- **Framing lama (rapuh):** "menerapkan microservices untuk meningkatkan fleksibilitas,
+  keandalan, dan meminimalkan risiko gangguan layanan" — ini klaim bahwa arsitektur
+  MEMECAHKAN masalah UPTD. Data lapangan tidak mendukung, dan tiap kali dibenturkan
+  ke kenyataan, klaim ini patah (persis yang terjadi di sidang proposal).
+- **Framing baru (tahan uji):** penelitian **evaluasi arsitektur** — menerapkan
+  microservices + message broker pada sistem pelaporan pemerintahan skala kecil, lalu
+  mengukur hasilnya secara empiris (fault-injection test + UAT) dan menilai apakah
+  kompleksitasnya sepadan dengan karakteristik organisasi.
+
+Kekuatan framing baru: kesimpulan "kompleksitas ini melebihi kebutuhan operasional saat
+ini" berubah dari KEKALAHAN menjadi TEMUAN PENELITIAN. Kalau penguji menyerang soal
+traffic kecil, jawabannya bukan bertahan, tapi: "Betul, dan itu justru salah satu temuan
+yang kami laporkan berdasarkan data wawancara."
+
+Preseden di tinjauan pustaka sendiri: **Blinowski dkk. (2022)** — rujukan #7, melakukan
+persis jenis evaluasi ini dan menyimpulkan pemilihan arsitektur bergantung pada
+karakteristik organisasi. Bedanya: mereka pakai lingkungan uji sintetis, skripsi ini
+punya studi kasus instansi nyata + data wawancara.
+
+Yang perlu diubah hanya bagian tulisan: **rumusan masalah, tujuan, dan kesimpulan BAB V.**
+Kode tidak berubah sama sekali. Rumusan masalah baru harus berbentuk pertanyaan yang tetap
+valid walau jawabannya "tidak sesuai" — user yang merumuskan kalimat finalnya sendiri.
+
+**STATUS: usulan, belum disetujui pembimbing.** Jangan tulis ke BAB apa pun sebelum ada
+persetujuan eksplisit. Jangan juga menulis justifikasi lama seolah wawancara ini tidak
+pernah terjadi.
+
+## Langkah Selanjutnya
+
+1. Konsultasi ke pembimbing membawa hasil wawancara + usulan framing evaluasi (prioritas).
+2. Selesaikan pengujian fault-injection JMeter (data ini jadi inti kontribusi di framing baru).
+3. UAT di UPTD PPA — catatan: laptop user rusak (harus selalu dicas), perlu solusi
+   akses (power bank laptop / deploy sementara ke cloud / lewat Diskominfo).
+4. Baru menyusun BAB IV-V setelah framing disetujui.

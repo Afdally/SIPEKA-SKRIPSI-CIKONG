@@ -1,0 +1,673 @@
+/* ============================================================
+   HALAMAN PUBLIK — SIPEKA
+   Dipakai bersama oleh LandingPage (pelaporan & cek status) dan
+   LoginPage (masuk petugas/admin). Digabung jadi satu file karena
+   keduanya berbagi bahasa visual yang sama: panel gradient gelap,
+   lingkaran dekoratif, dan gaya form yang seragam.
+
+   Design token (--brand-*, --slate-*, --grad-brand, dst) didefinisikan
+   di App.css, bukan di sini.
+
+   Daftar isi:
+     1. Panel gradient & dekorasi (dipakai landing + login)
+     2. Landing — header & hero
+     3. Landing — kartu form & tab
+     4. Landing — kontrol form (input, toggle, section)
+     5. Landing — langkah "Ceritakan Kejadian"
+     6. Landing — pelacak status laporan
+     7. Login — tata letak dua kolom
+     8. Login — form & tombol
+   ============================================================ */
+
+body {
+  background-color: var(--slate-050);
+}
+
+/* ============================================================
+   1. PANEL GRADIENT & DEKORASI  (landing + login)
+   Hero landing dan panel kiri login memakai gradient serta
+   lingkaran transparan yang sama persis, jadi didefinisikan
+   satu kali di sini.
+   ============================================================ */
+.hero-landing,
+.auth-left {
+  background: var(--grad-brand);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Lingkaran dekoratif. Di landing dipasang sebagai elemen sendiri
+   (.hero-glow-*) karena markup-nya sudah begitu; di login memakai
+   pseudo-element supaya tidak perlu elemen kosong tambahan. */
+.hero-glow-1,
+.hero-glow-2,
+.auth-left::before,
+.auth-left::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background-color: var(--glow);
+  pointer-events: none;
+}
+.hero-glow-1,
+.auth-left::before {
+  top: -100px; right: -100px;
+  width: 400px; height: 400px;
+}
+.hero-glow-2,
+.auth-left::after {
+  bottom: -80px; left: -80px;
+  width: 300px; height: 300px;
+}
+
+/* ============================================================
+   2. LANDING — HEADER & HERO
+   ============================================================ */
+.header-premium {
+  background-color: var(--brand-950);
+  border-bottom: 1px solid rgba(11, 67, 112, 0.5);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.hero-landing {
+  padding-top: 4rem;
+  padding-bottom: 8rem;
+}
+
+/* Panel kaca "100% Rahasia & Aman" di sisi kanan hero */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  transition: transform 0.3s;
+}
+.glass-panel:hover {
+  transform: scale(1.02);
+}
+
+/* ============================================================
+   3. LANDING — KARTU FORM & TAB
+   ============================================================ */
+.form-card {
+  background: white;
+  border-radius: var(--radius-xl);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--slate-100);
+  margin-top: -5rem; /* menumpuk di atas hero */
+  position: relative;
+  z-index: 20;
+  overflow: hidden;
+}
+
+.tab-header {
+  background-color: var(--slate-050);
+  padding: 0.625rem;
+  border-bottom: 1px solid var(--slate-100);
+  display: flex;
+}
+.tab-btn {
+  flex: 1;
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  transition: all 0.3s;
+  border: none;
+  background: transparent;
+}
+.tab-btn.active {
+  background-color: white;
+  color: var(--brand-700);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+.tab-btn.inactive {
+  color: var(--slate-500);
+}
+.tab-btn.inactive:hover {
+  color: var(--slate-800);
+}
+
+/* ============================================================
+   4. LANDING — KONTROL FORM
+   ============================================================ */
+.form-label-premium {
+  color: var(--slate-700);
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+.form-control-premium,
+.form-select-premium {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: var(--slate-050);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-md);
+  color: var(--slate-800);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+.form-control-premium:focus,
+.form-select-premium:focus {
+  outline: none;
+  background-color: white;
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 4px rgba(14, 148, 235, 0.15);
+}
+
+/* Kolom yang nilainya berasal dari analisis cerita, bukan diketik pelapor.
+   Ditandai supaya jelas bagian mana yang perlu diteliti ulang — sistem
+   mengusulkan, pelapor yang memverifikasi. Tandanya hilang begitu kolomnya
+   disunting sendiri (lihat handleChange di LandingPage.jsx). */
+.form-control-premium.terisi-otomatis,
+.form-select-premium.terisi-otomatis {
+  background-color: #eff6ff;
+  border-color: var(--brand-500);
+  border-left-width: 3px;
+}
+
+.form-control-premium.terisi-otomatis:focus,
+.form-select-premium.terisi-otomatis:focus {
+  background-color: white;
+}
+
+/* Judul bernomor: "1 Data Pelapor", "2 Data Korban", dst */
+.form-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--slate-100);
+  margin-bottom: 1.5rem;
+}
+.section-number {
+  width: 1.75rem;
+  height: 1.75rem;
+  background-color: var(--brand-050);
+  color: var(--brand-600);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Kotak informasi berwarna di atas form (peringatan, notifikasi auto-isi) */
+.alert-callout {
+  background-color: #ecfdf5;
+  border: 1px solid #d1fae5;
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+/* Sakelar "Laporkan Secara Anonim" */
+.switch-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background-color: var(--slate-050);
+  border: 1px solid var(--slate-100);
+  border-radius: var(--radius-lg);
+}
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 2.75rem;
+  height: 1.5rem;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--slate-300);
+  transition: 0.4s;
+  border-radius: 2rem;
+}
+.slider::before {
+  position: absolute;
+  content: "";
+  height: 1.25rem;
+  width: 1.25rem;
+  left: 0.125rem;
+  bottom: 0.125rem;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+input:checked + .slider {
+  background-color: var(--brand-600);
+}
+input:checked + .slider::before {
+  transform: translateX(1.25rem);
+}
+
+/* Kode laporan yang ditampilkan setelah berhasil kirim */
+.kode-highlight {
+  font-family: monospace;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #0d3d8e;
+  letter-spacing: 2px;
+  background: var(--brand-050);
+  padding: 0.75rem 1.5rem;
+  border: 1px solid #e0effe;
+  border-radius: var(--radius-md);
+  display: inline-block;
+}
+
+/* ============================================================
+   5. LANDING — LANGKAH "CERITAKAN KEJADIAN"
+   Layar pertama tab "Buat Laporan Baru".
+   ============================================================ */
+.cerita-step-header {
+  text-align: center;
+  padding: 0.5rem 0;
+}
+.cerita-step-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0 auto 1rem;
+  background: linear-gradient(135deg, var(--brand-500), #6366f1);
+  border-radius: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+  box-shadow: 0 10px 20px -6px rgba(14, 148, 235, 0.4);
+}
+
+/* Status "Menganalisis cerita Anda..." */
+.cerita-analyzing-box {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: var(--brand-050);
+  border: 1px solid #dbeafe;
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+}
+.cerita-analyzing-spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid #bfdbfe;
+  border-top-color: var(--brand-500);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Pilihan cara bertemu petugas (kartu radio) */
+.preferensi-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+.preferensi-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  background-color: var(--slate-050);
+  border: 1.5px solid var(--slate-200);
+  border-radius: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+}
+.preferensi-card:hover {
+  border-color: #93c5fd;
+  background-color: #fff;
+}
+.preferensi-card.selected {
+  border-color: var(--brand-500);
+  background-color: var(--brand-050);
+  box-shadow: 0 0 0 3px rgba(14, 148, 235, 0.12);
+}
+.preferensi-card input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.preferensi-card-icon {
+  font-size: 1.35rem;
+  color: var(--slate-400);
+  transition: color 0.2s;
+}
+.preferensi-card.selected .preferensi-card-icon {
+  color: var(--brand-600);
+}
+.preferensi-card-label {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--slate-800);
+}
+.preferensi-card-desc {
+  font-size: 0.75rem;
+  color: var(--slate-500);
+  line-height: 1.45;
+}
+
+/* Pernyataan kebenaran laporan */
+.pernyataan-box {
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 0.875rem;
+  padding: 1rem 1.1rem;
+}
+.pernyataan-box label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  cursor: pointer;
+  margin: 0;
+  font-size: 0.8rem;
+  color: #78350f;
+  line-height: 1.55;
+}
+.pernyataan-box input[type="checkbox"] {
+  margin-top: 0.2rem;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  accent-color: #d97706;
+  cursor: pointer;
+}
+
+/* Sakelar simulasi kegagalan AI — hapus kalau nlp-service asli sudah jalan */
+.cerita-demo-toggle {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  background-color: #fafafa;
+  border: 1px dashed #d4d4d8;
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  color: #71717a;
+}
+.cerita-demo-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  margin: 0;
+}
+
+/* ============================================================
+   6. LANDING — PELACAK STATUS LAPORAN
+   Tab "Cek Status Laporan".
+   ============================================================ */
+.tracker-stepper {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tracker-line {
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  transform: translateY(-50%);
+  height: 4px;
+  background-color: var(--slate-200);
+  z-index: 1;
+}
+.tracker-line-fill {
+  height: 100%;
+  background-color: var(--brand-500);
+  transition: width 0.7s;
+}
+.tracker-step {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.tracker-circle {
+  width: 3rem;
+  height: 3rem;
+  background-color: white;
+  border: 4px solid var(--slate-200);
+  color: var(--slate-400);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.3s;
+}
+.tracker-circle.completed {
+  background-color: var(--brand-600);
+  border-color: white;
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+.tracker-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-top: 0.5rem;
+  color: var(--slate-400);
+}
+.tracker-label.completed {
+  color: var(--brand-600);
+}
+
+/* ============================================================
+   7. LOGIN — TATA LETAK DUA KOLOM
+   ============================================================ */
+.auth-body {
+  display: flex;
+  min-height: 100vh;
+  background: #f9fafb;
+}
+
+.auth-left {
+  width: 42%;
+  padding: 48px;
+  display: flex;
+  align-items: center;
+  color: white;
+}
+.auth-left-content {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 48px;
+  color: white;
+  cursor: pointer;
+}
+.auth-logo-icon img,
+.auth-logo-icon svg {
+  width: 44px;
+  height: auto;
+}
+.auth-logo-main {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+}
+.auth-logo-sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.auth-left-title {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.3;
+  margin-bottom: 20px;
+}
+.auth-left-desc {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.7;
+}
+
+.auth-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+.auth-form-container {
+  width: 100%;
+  max-width: 400px;
+}
+
+/* Panel kiri disembunyikan di layar kecil supaya form dapat ruang penuh */
+@media (max-width: 768px) {
+  .auth-left { display: none; }
+  .auth-right { background: white; }
+}
+
+/* ============================================================
+   8. LOGIN — FORM & TOMBOL
+   ============================================================ */
+.auth-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--gray-500);
+  font-weight: 500;
+  margin-bottom: 32px;
+  transition: color 0.2s;
+}
+.auth-back-link:hover {
+  color: var(--indigo-600);
+}
+
+.auth-form-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+.auth-form-subtitle {
+  font-size: 15px;
+  color: var(--gray-500);
+  margin-bottom: 32px;
+}
+
+.form-label-custom {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  display: block;
+  margin-bottom: 8px;
+}
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--slate-400);
+  font-size: 18px;
+  pointer-events: none;
+}
+.form-input {
+  width: 100%;
+  padding: 12px 14px 12px 44px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  font-size: 15px;
+  outline: none;
+  transition: all 0.2s;
+  background: white;
+}
+.form-input:focus {
+  border-color: var(--indigo-600);
+  box-shadow: 0 0 0 4px rgba(26, 86, 219, 0.1);
+}
+.input-toggle {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--slate-400);
+  display: flex;
+  align-items: center;
+  font-size: 18px;
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 14px;
+  background: var(--indigo-600);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.btn-submit:hover {
+  background: var(--indigo-700);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(26, 86, 219, 0.2);
+}
+.btn-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.auth-alert-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+/* Spinner kecil di tombol saat proses login (@keyframes spin di App.css) */
+.spinner-sm {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}

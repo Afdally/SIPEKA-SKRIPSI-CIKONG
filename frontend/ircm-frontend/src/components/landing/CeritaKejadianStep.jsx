@@ -1,41 +1,82 @@
 import React, { useState } from 'react';
 import { analisisKronologi } from '../../services/nlpService';
 
-// Layar pertama tab "Buat Laporan Baru": pelapor cerita dulu bebas, baru form
-// detail (nama korban, usia, dll) di-isi otomatis dari cerita itu. Kalau AI-nya
-// gagal/tidak tersedia, pelapor tetap bisa lanjut isi form manual seperti biasa —
-// tidak ada yang sampai gagal lapor gara-gara fitur ini.
+// Nilai preferensi_layanan harus sama persis dengan yang disimpan di
+// Laporan.js (report-service), karena petugas membacanya apa adanya.
+const PREFERENSI_OPTIONS = [
+  {
+    value: 'Datang ke UPTD',
+    icon: 'bi-building-fill',
+    label: 'Saya akan datang ke UPTD',
+    desc: 'Anda mendatangi kantor UPTD PPA sesuai jadwal yang disepakati petugas.',
+  },
+  {
+    value: 'Petugas Mendatangi Korban',
+    icon: 'bi-geo-alt-fill',
+    label: 'Petugas datang ke lokasi saya',
+    desc: 'Petugas akan mendatangi lokasi Anda secara rahasia sesuai kesepakatan.',
+  },
+];
+
+// Layar pertama tab "Buat Laporan Baru". Tiga hal dikumpulkan di sini:
+// (1) cerita bebas — jadi bahan auto-isi form berikutnya lewat nlp-service,
+// (2) preferensi cara layanan — supaya pelapor tahu sejak awal bahwa laporan
+//     ini akan ditindaklanjuti dengan pertemuan nyata,
+// (3) pernyataan kebenaran laporan — dasar pertanggungjawaban, sekaligus
+//     penyaring ringan laporan iseng tanpa mempersulit korban asli.
+// Kalau AI-nya gagal/tidak tersedia, pelapor tetap bisa lanjut isi form manual.
 export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSelesai, onSkip }) {
   const [kronologi, setKronologi] = useState('');
   const [telepon, setTelepon] = useState(teleponAwal || '');
+  const [preferensi, setPreferensi] = useState('');
+  const [setuju, setSetuju] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
   const [simulasikanGagal, setSimulasikanGagal] = useState(false);
 
-  const handleAnalisis = async (e) => {
-    e.preventDefault();
+  // Validasi yang sama dipakai tombol "Analisis AI" maupun "Lewati, isi manual",
+  // supaya tidak ada jalur yang bisa melewati pernyataan kesediaan.
+  const validasi = () => {
     if (kronologi.trim().length < 50) {
-      setError('Ceritakan kejadiannya minimal 50 huruf supaya bisa dianalisis dengan baik.');
-      return;
+      return 'Ceritakan kejadiannya minimal 50 huruf supaya bisa ditindaklanjuti dengan baik.';
     }
     if (!telepon) {
-      setError('No. telepon/WhatsApp wajib diisi untuk keperluan tindak lanjut petugas.');
-      return;
+      return 'No. telepon/WhatsApp wajib diisi untuk keperluan tindak lanjut petugas.';
     }
+    if (!preferensi) {
+      return 'Silakan pilih bagaimana Anda ingin ditemui petugas.';
+    }
+    if (!setuju) {
+      return 'Mohon centang pernyataan kesediaan sebelum melanjutkan.';
+    }
+    return '';
+  };
+
+  const handleAnalisis = async (e) => {
+    e.preventDefault();
+    const pesanError = validasi();
+    if (pesanError) { setError(pesanError); return; }
+
     setError('');
     setAnalyzing(true);
     try {
-      const hasil = await analisisKronologi(kronologi, { masterKekerasan, forceFail: simulasikanGagal });
-      onSelesai(kronologi, telepon, hasil, false);
+      const analisis = await analisisKronologi(kronologi, { masterKekerasan, forceFail: simulasikanGagal });
+      onSelesai({ kronologi, telepon, preferensi, setuju, analisis, gagal: false });
     } catch (err) {
-      onSelesai(kronologi, telepon, null, true);
+      // 422/429 dari backend: tampilkan alasannya, jangan lanjut ke form.
+      const pesanServer = err.response?.data?.message;
+      if (pesanServer) { setError(pesanServer); return; }
+      onSelesai({ kronologi, telepon, preferensi, setuju, analisis: null, gagal: true });
     } finally {
       setAnalyzing(false);
     }
   };
 
   const handleSkip = () => {
-    onSkip(kronologi, telepon);
+    const pesanError = validasi();
+    if (pesanError) { setError(pesanError); return; }
+    setError('');
+    onSkip({ kronologi, telepon, preferensi, setuju });
   };
 
   return (
@@ -79,6 +120,51 @@ export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSel
           <p className="text-muted mt-1 fst-italic m-0" style={{ fontSize: '0.7rem' }}>*) Digunakan khusus oleh petugas untuk tindak lanjut</p>
         </div>
 
+        {/* Preferensi layanan — ditanyakan di awal supaya pelapor paham sejak
+            mula bahwa laporan ini berujung pada pertemuan dengan petugas. */}
+        <div className="mb-4">
+          <label className="form-label-premium">Bagaimana Anda Ingin Ditemui Petugas? <span className="text-danger">*</span></label>
+          <div className="preferensi-options">
+            {PREFERENSI_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className={`preferensi-card${preferensi === opt.value ? ' selected' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="preferensi_layanan"
+                  value={opt.value}
+                  checked={preferensi === opt.value}
+                  onChange={(e) => setPreferensi(e.target.value)}
+                  disabled={analyzing}
+                />
+                <i className={`bi ${opt.icon} preferensi-card-icon`}></i>
+                <span className="preferensi-card-label">{opt.label}</span>
+                <span className="preferensi-card-desc">{opt.desc}</span>
+              </label>
+            ))}
+          </div>
+          <p className="text-muted mt-2 fst-italic m-0" style={{ fontSize: '0.7rem' }}>
+            *) Jadwal dan lokasi pastinya akan dikonfirmasi ulang oleh petugas melalui telepon
+          </p>
+        </div>
+
+        {/* Pernyataan kebenaran — dasar pertanggungjawaban laporan */}
+        <div className="pernyataan-box mb-4">
+          <label>
+            <input
+              type="checkbox"
+              checked={setuju}
+              onChange={(e) => setSetuju(e.target.checked)}
+              disabled={analyzing}
+            />
+            <span>
+              Saya menyatakan bahwa laporan ini <strong>benar dan dapat dipertanggungjawabkan</strong>,
+              serta bersedia dihubungi dan ditemui petugas UPTD PPA untuk proses tindak lanjut.
+            </span>
+          </label>
+        </div>
+
         {error && <div className="alert alert-danger rounded-3 small">{error}</div>}
 
         {analyzing ? (
@@ -100,20 +186,6 @@ export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSel
           </div>
         )}
       </form>
-
-      {/* Kontrol demo — HAPUS bagian ini kalau nlp-service asli sudah terpasang.
-          Cuma buat mensimulasikan skenario AI gagal tanpa perlu backend beneran. */}
-      <div className="cerita-demo-toggle">
-        <label>
-          <input
-            type="checkbox"
-            checked={simulasikanGagal}
-            onChange={(e) => setSimulasikanGagal(e.target.checked)}
-            disabled={analyzing}
-          />
-          Mode demo: simulasikan AI gagal / tidak tersedia
-        </label>
-      </div>
     </div>
   );
 }

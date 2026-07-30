@@ -2,8 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import laporanService from '../services/laporanService';
 import CeritaKejadianStep from '../components/landing/CeritaKejadianStep';
-import './Landing.css';
+import './Public.css';
 import logo from '../assets/logo.png';
+
+// Field formulir yang boleh diisi dari hasil analisis cerita. Namanya sengaja
+// dibuat sama dengan kunci yang dikembalikan report-service, jadi pemetaannya
+// langsung tanpa tabel penerjemah.
+//
+// NIK sengaja TIDAK ada di daftar ini: nomornya tidak akan muncul di cerita, dan
+// NIK yang salah berbahaya karena laporan ini jadi dasar penanganan kasus.
+const FIELD_AUTOFILL = [
+  'namaKorban',
+  'namaPelapor',
+  'usiaKorban',
+  'jenisKelamin',
+  'hubunganKorban',
+  'jenisKekerasan',
+  'kelurahanKorban',
+  'lokasiKejadian',
+  'tanggalKejadian',
+];
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -18,15 +36,22 @@ export default function LandingPage() {
   // Master Data State
   const [masterKekerasan, setMasterKekerasan] = useState([]);
 
-  // Alur "cerita dulu, form auto-fill" (prototipe UX, nlp-service masih mock)
+  // Alur "cerita dulu, form auto-fill"
   const [showCeritaStep, setShowCeritaStep] = useState(true);
-  const [autoFillNotice, setAutoFillNotice] = useState(null); // null | 'success' | 'failed'
+  // null (isi manual) | 'model' (Ollama) | 'aturan' | 'lokal' | 'failed'
+  const [autoFillNotice, setAutoFillNotice] = useState(null);
+  // Nama field yang nilainya berasal dari analisis — dipakai untuk menandai
+  // input mana yang perlu diteliti ulang pelapor.
+  const [fieldTerisiOtomatis, setFieldTerisiOtomatis] = useState([]);
+
+  // Dikumpulkan di langkah awal (CeritaKejadianStep), dikirim bersama laporan
+  const [preferensiLayanan, setPreferensiLayanan] = useState('');
+  const [pernyataanBenar, setPernyataanBenar] = useState(false);
 
   // Laporan form state (Single-step)
   const [isAnonim, setIsAnonim] = useState(false);
   const [loadingSubmit, setLoadingSubmit] = useState(false);
   const [submitResult, setSubmitResult] = useState(null);
-  const [showPrefModal, setShowPrefModal] = useState(false);
   const [fotoBukti, setFotoBukti] = useState(null);
   const [formData, setFormData] = useState({
     namaPelapor: '', nikPelapor: '', teleponPelapor: '', hubunganKorban: '',
@@ -40,32 +65,50 @@ export default function LandingPage() {
       .catch(err => console.error('Gagal memuat kategori:', err));
   }, []);
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    // Begitu pelapor menyunting sendiri, tanda "diisi otomatis" dilepas —
+    // nilainya sudah jadi tanggung jawab dia, bukan usulan sistem lagi.
+    setFieldTerisiOtomatis(prev => prev.filter(f => f !== name));
+  };
+
+  // Tempelkan penanda visual pada input yang nilainya berasal dari analisis.
+  const kelasInput = (dasar, nama) =>
+    fieldTerisiOtomatis.includes(nama) ? `${dasar} terisi-otomatis` : dasar;
   const handleFileChange = (e) => setFotoBukti(e.target.files[0] || null);
 
-  // Dipanggil CeritaKejadianStep setelah analisis AI selesai (berhasil ataupun gagal)
-  const handleCeritaSelesai = (kronologiText, telepon, extracted, failed) => {
-    setFormData(prev => ({
-      ...prev,
-      kronologi: kronologiText,
-      teleponPelapor: telepon || prev.teleponPelapor,
-      ...(extracted && !failed ? {
-        usiaKorban: extracted.usiaKorban || prev.usiaKorban,
-        jenisKelamin: extracted.jenisKelamin || prev.jenisKelamin,
-        jenisKekerasan: extracted.jenisKekerasan || prev.jenisKekerasan,
-      } : {}),
-    }));
-    setAutoFillNotice(failed ? 'failed' : 'success');
+  // Dipanggil CeritaKejadianStep setelah analisis selesai (berhasil ataupun gagal).
+  // `analisis` = { sumber, catatan, hasil, terisi } dari nlpService.
+  const handleCeritaSelesai = ({ kronologi, telepon, preferensi, setuju, analisis, gagal }) => {
+    const usulan = (!gagal && analisis?.hasil) || {};
+    // Hanya field yang benar-benar ada nilainya yang ditimpa, sisanya biarkan
+    // apa adanya supaya isian pelapor sebelumnya tidak terhapus.
+    const terisi = FIELD_AUTOFILL.filter(f => usulan[f] !== null && usulan[f] !== undefined && usulan[f] !== '');
+
+    setFormData(prev => {
+      const berikut = { ...prev, kronologi, teleponPelapor: telepon || prev.teleponPelapor };
+      terisi.forEach(f => { berikut[f] = String(usulan[f]); });
+      return berikut;
+    });
+
+    setFieldTerisiOtomatis(terisi);
+    setPreferensiLayanan(preferensi);
+    setPernyataanBenar(setuju);
+    setAutoFillNotice(gagal ? 'failed' : (analisis?.sumber || 'success'));
     setShowCeritaStep(false);
   };
 
   // Dipanggil kalau pelapor memilih lewati AI dan isi form manual dari awal
-  const handleSkipCerita = (kronologiText, telepon) => {
+  const handleSkipCerita = ({ kronologi, telepon, preferensi, setuju }) => {
     setFormData(prev => ({
       ...prev,
-      kronologi: kronologiText,
+      kronologi,
       teleponPelapor: telepon || prev.teleponPelapor,
     }));
+    setFieldTerisiOtomatis([]);
+    setPreferensiLayanan(preferensi);
+    setPernyataanBenar(setuju);
     setAutoFillNotice(null);
     setShowCeritaStep(false);
   };
@@ -85,20 +128,17 @@ export default function LandingPage() {
     }
   };
 
-  const handlePreSubmit = (e) => {
+  // Preferensi layanan & pernyataan kebenaran sudah dikonfirmasi di langkah awal
+  // (CeritaKejadianStep), jadi submit di sini langsung jalan tanpa modal lagi.
+  const handleSubmitLaporan = async (e) => {
     e.preventDefault();
     if (formData.kronologi.length < 50) return alert('Kronologi minimal 50 karakter');
-    
-    const usia = parseInt(formData.usiaKorban);
-    if (usia < 18 && isAnonim) {
+
+    const usiaCek = parseInt(formData.usiaKorban);
+    if (usiaCek < 18 && isAnonim) {
       return alert('Untuk korban anak-anak (di bawah 18 tahun), laporan wajib mencantumkan identitas pelapor/wali.');
     }
-    
-    setShowPrefModal(true);
-  };
 
-  const finalSubmit = async (pref) => {
-    setShowPrefModal(false);
     setLoadingSubmit(true);
     const fd = new FormData();
     const usia = parseInt(formData.usiaKorban);
@@ -127,7 +167,8 @@ export default function LandingPage() {
     fd.append('tanggal_kejadian', formData.tanggalKejadian);
     fd.append('lokasi_kejadian', formData.lokasiKejadian);
     fd.append('kronologi', formData.kronologi);
-    fd.append('preferensi_layanan', pref);
+    fd.append('preferensi_layanan', preferensiLayanan);
+    fd.append('pernyataan_benar', String(pernyataanBenar));
     if (fotoBukti) fd.append('bukti_file', fotoBukti);
 
     try {
@@ -309,13 +350,22 @@ export default function LandingPage() {
             {/* TAB LAPOR - Langkah 2: Form detail (sudah ada sebelumnya, tetap sama;
                 cuma sekarang bisa datang dalam keadaan sudah terisi sebagian) */}
             {activeTab === 'lapor' && !submitResult && !showCeritaStep && (
-              <form onSubmit={handlePreSubmit}>
-                {autoFillNotice === 'success' && (
+              <form onSubmit={handleSubmitLaporan}>
+                {['model', 'aturan', 'lokal', 'success'].includes(autoFillNotice) && (
                   <div className="alert-callout mb-4" style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }}>
                     <i className="bi bi-stars fs-4" style={{ color: '#0e94eb' }}></i>
                     <div>
-                      <h5 className="fw-bold mb-1" style={{ fontSize: '0.875rem', color: '#0e94eb' }}>Beberapa Data Terisi Otomatis</h5>
-                      <p className="mb-0" style={{ fontSize: '0.875rem', color: '#0e94eb', opacity: 0.85 }}>Sistem mendeteksi beberapa informasi dari cerita Anda. Silakan periksa dan koreksi jika ada yang kurang tepat sebelum mengirim.</p>
+                      <h5 className="fw-bold mb-1" style={{ fontSize: '0.875rem', color: '#0e94eb' }}>
+                        {fieldTerisiOtomatis.length > 0
+                          ? `${fieldTerisiOtomatis.length} Data Terisi Otomatis`
+                          : 'Tidak Ada Data yang Bisa Diisi Otomatis'}
+                      </h5>
+                      <p className="mb-0" style={{ fontSize: '0.875rem', color: '#0e94eb', opacity: 0.85 }}>
+                        {fieldTerisiOtomatis.length > 0
+                          ? 'Kolom yang bertanda biru diisi dari cerita Anda — ini hanya usulan sistem. Mohon periksa dan koreksi kalau ada yang kurang tepat sebelum mengirim.'
+                          : 'Cerita Anda sudah tersimpan, tapi sistem belum menemukan keterangan yang cukup jelas. Silakan lengkapi formulir di bawah.'}
+                        {autoFillNotice !== 'model' && ' (Analisis lengkap sedang tidak tersedia, dipakai pembacaan sederhana.)'}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -369,7 +419,7 @@ export default function LandingPage() {
                   {!isAnonim && (
                     <div className="col-md-12">
                       <label className="form-label-premium">Nama Lengkap Pelapor <span className="text-danger">*</span></label>
-                      <input name="namaPelapor" type="text" className="form-control-premium" required value={formData.namaPelapor} onChange={handleChange} placeholder="Masukkan nama pelapor" />
+                      <input name="namaPelapor" type="text" className={kelasInput('form-control-premium', 'namaPelapor')} required value={formData.namaPelapor} onChange={handleChange} placeholder="Masukkan nama pelapor" />
                     </div>
                   )}
                   
@@ -382,7 +432,7 @@ export default function LandingPage() {
                   {!isAnonim && (
                     <div className="col-md-6">
                       <label className="form-label-premium">Hubungan dg Korban <span className="text-danger">*</span></label>
-                      <select name="hubunganKorban" className="form-select-premium" required value={formData.hubunganKorban} onChange={handleChange}>
+                      <select name="hubunganKorban" className={kelasInput('form-select-premium', 'hubunganKorban')} required value={formData.hubunganKorban} onChange={handleChange}>
                         <option value="">-- Pilih --</option>
                         <option>Orang Tua</option><option>Anak</option><option>Saudara</option><option>Suami/Istri</option><option>Tetangga</option><option>Teman</option><option>Diri Sendiri</option>
                       </select>
@@ -398,15 +448,15 @@ export default function LandingPage() {
                 <div className="row g-4 mb-5">
                   <div className="col-md-6">
                     <label className="form-label-premium">Nama Korban <span className="text-danger">*</span></label>
-                    <input name="namaKorban" type="text" className="form-control-premium" required value={formData.namaKorban} onChange={handleChange} placeholder="Masukkan nama korban" />
+                    <input name="namaKorban" type="text" className={kelasInput('form-control-premium', 'namaKorban')} required value={formData.namaKorban} onChange={handleChange} placeholder="Masukkan nama korban" />
                   </div>
                   <div className="col-md-3">
                     <label className="form-label-premium">Usia <span className="text-danger">*</span></label>
-                    <input name="usiaKorban" type="number" className="form-control-premium text-center" min={0} required value={formData.usiaKorban} onChange={handleChange} placeholder="Th" />
+                    <input name="usiaKorban" type="number" className={kelasInput('form-control-premium text-center', 'usiaKorban')} min={0} required value={formData.usiaKorban} onChange={handleChange} placeholder="Th" />
                   </div>
                   <div className="col-md-3">
                     <label className="form-label-premium">Jenis Kelamin <span className="text-danger">*</span></label>
-                    <select name="jenisKelamin" className="form-select-premium" required value={formData.jenisKelamin} onChange={handleChange}>
+                    <select name="jenisKelamin" className={kelasInput('form-select-premium', 'jenisKelamin')} required value={formData.jenisKelamin} onChange={handleChange}>
                       <option value="">-- Pilih --</option><option>Laki-laki</option><option>Perempuan</option>
                     </select>
                   </div>
@@ -416,7 +466,7 @@ export default function LandingPage() {
                   </div>
                   <div className="col-md-5">
                     <label className="form-label-premium">Kelurahan Kejadian <span className="text-danger">*</span></label>
-                    <select name="kelurahanKorban" className="form-select-premium" required value={formData.kelurahanKorban} onChange={handleChange}>
+                    <select name="kelurahanKorban" className={kelasInput('form-select-premium', 'kelurahanKorban')} required value={formData.kelurahanKorban} onChange={handleChange}>
                       <option value="">-- Pilih Kelurahan --</option>
                       <optgroup label="Kec. Mandonga"><option>Mandonga</option><option>Alolama</option><option>Labibia</option><option>Korumba</option></optgroup>
                       <optgroup label="Kec. Kendari"><option>Kandai</option><option>Gunung Jati</option><option>Kampung Salo</option></optgroup>
@@ -441,7 +491,7 @@ export default function LandingPage() {
                 <div className="row g-4 mb-4">
                   <div className="col-md-6">
                     <label className="form-label-premium">Jenis Kasus / Kekerasan <span className="text-danger">*</span></label>
-                    <select name="jenisKekerasan" className="form-select-premium" required value={formData.jenisKekerasan} onChange={handleChange}>
+                    <select name="jenisKekerasan" className={kelasInput('form-select-premium', 'jenisKekerasan')} required value={formData.jenisKekerasan} onChange={handleChange}>
                       <option value="">-- Pilih --</option>
                       {masterKekerasan.map(k => (
                         <option key={k._id} value={k.nama_kategori}>{k.nama_kategori}</option>
@@ -450,11 +500,11 @@ export default function LandingPage() {
                   </div>
                   <div className="col-md-6">
                     <label className="form-label-premium">Tanggal Kejadian <span className="text-danger">*</span></label>
-                    <input name="tanggalKejadian" type="date" max={new Date().toISOString().split('T')[0]} className="form-control-premium" required value={formData.tanggalKejadian} onChange={handleChange} />
+                    <input name="tanggalKejadian" type="date" max={new Date().toISOString().split('T')[0]} className={kelasInput('form-control-premium', 'tanggalKejadian')} required value={formData.tanggalKejadian} onChange={handleChange} />
                   </div>
                   <div className="col-md-12">
                     <label className="form-label-premium">Lokasi Spesifik Kejadian <span className="text-danger">*</span></label>
-                    <input name="lokasiKejadian" type="text" className="form-control-premium" required value={formData.lokasiKejadian} onChange={handleChange} placeholder="Contoh: Rumah pelaku, Kos Paperu, Jalan raya, dsb." />
+                    <input name="lokasiKejadian" type="text" className={kelasInput('form-control-premium', 'lokasiKejadian')} required value={formData.lokasiKejadian} onChange={handleChange} placeholder="Contoh: Rumah pelaku, Kos Paperu, Jalan raya, dsb." />
                   </div>
                   <div className="col-md-12">
                     <div className="d-flex justify-content-between align-items-center mb-1">
@@ -528,34 +578,6 @@ export default function LandingPage() {
           </div>
         </div>
       </div>
-
-      {/* MODAL PREFERENSI LAYANAN */}
-      {showPrefModal && (
-        <div className="modal fade show d-block" style={{ background: 'rgba(7, 43, 74, 0.8)', backdropFilter: 'blur(5px)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '1.5rem', overflow: 'hidden' }}>
-              <div className="modal-header border-0 pb-0 pt-4 px-4 text-center d-block position-relative">
-                <div className="bg-primary bg-opacity-10 text-primary mx-auto rounded-circle d-flex align-items-center justify-content-center mb-3" style={{ width: '4rem', height: '4rem' }}>
-                  <i className="bi bi-building-check fs-2"></i>
-                </div>
-                <h4 className="modal-title fw-bold text-dark">Konfirmasi Layanan UPTD</h4>
-                <button type="button" className="btn-close position-absolute top-0 end-0 mt-4 me-4" onClick={() => setShowPrefModal(false)}></button>
-              </div>
-              <div className="modal-body text-center p-4">
-                <p className="text-muted mb-4">Satu langkah lagi! Apakah Anda bersedia datang langsung ke kantor UPTD, atau Anda ingin pihak UPTD mendatangi lokasi Anda secara rahasia?</p>
-                <div className="d-grid gap-3">
-                  <button type="button" className="btn btn-primary py-3 fw-bold shadow-sm" style={{ borderRadius: '0.75rem', backgroundColor: '#0276cb' }} onClick={() => finalSubmit('Datang ke UPTD')}>
-                    <i className="bi bi-building-fill me-2"></i> Saya Akan Datang ke UPTD
-                  </button>
-                  <button type="button" className="btn btn-outline-primary py-3 fw-bold bg-light" style={{ borderRadius: '0.75rem' }} onClick={() => finalSubmit('Petugas Mendatangi Korban')}>
-                    <i className="bi bi-geo-alt-fill me-2"></i> Petugas Datang ke Lokasi
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* FOOTER */}
       <footer className="text-center py-5 mt-5" style={{ backgroundColor: '#072b4a', borderTop: '1px solid rgba(11, 67, 112, 0.5)' }}>

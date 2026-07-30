@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import writeExcelFile from 'write-excel-file/browser';
 import logo from '../assets/logo.png';
 import authService from '../services/authService';
 import laporanService from '../services/laporanService';
@@ -9,6 +10,35 @@ import JenisKasusChart from '../components/dashboard/JenisKasusChart';
 import DemografiChart from '../components/dashboard/DemografiChart';
 import ActivityFeed from '../components/dashboard/ActivityFeed';
 import './Dashboard.css';
+
+// Status mentah di database -> label yang layak dibaca petugas/pimpinan.
+// Menampung dua penamaan yang beredar: milik Laporan (report-service) dan
+// milik Kasus (case-service), supaya ekspor tidak pernah menampilkan snake_case.
+const STATUS_LABELS = {
+  menunggu_registrasi: 'Menunggu Registrasi',
+  registrasi: 'Registrasi',
+  proses_assessment: 'Proses Assessment',
+  assessment: 'Proses Assessment',
+  dalam_penanganan: 'Dalam Penanganan',
+  penanganan: 'Dalam Penanganan',
+  selesai: 'Selesai',
+};
+
+const labelStatus = (status) => STATUS_LABELS[status] || status || '-';
+
+// Kolom file ekspor. `width` dalam satuan lebar karakter Excel.
+const EXPORT_COLUMNS = [
+  { key: 'kode_laporan',    header: 'Kode Laporan',     width: 18 },
+  { key: 'tanggal',         header: 'Tanggal Kejadian', width: 16, type: Date, format: 'dd/mm/yyyy' },
+  { key: 'nama_korban',     header: 'Nama Korban',      width: 24 },
+  { key: 'usia_korban',     header: 'Usia',             width: 7,  type: Number, align: 'center' },
+  { key: 'jenis_kelamin',   header: 'Jenis Kelamin',    width: 14 },
+  { key: 'kelurahan_korban', header: 'Wilayah',         width: 18 },
+  { key: 'jenis_kekerasan', header: 'Jenis Kekerasan',  width: 20 },
+  { key: 'kategori',        header: 'Kategori',         width: 12 },
+  { key: 'status',          header: 'Status',           width: 20 },
+  { key: 'kronologi',       header: 'Kronologi',        width: 60, wrap: true },
+];
 
 const MENU_ITEMS = [
   { id: 'dashboard', icon: 'bi-grid-1x2-fill', label: 'Dashboard' },
@@ -34,6 +64,7 @@ export default function DashboardSuperAdmin() {
   const [filterKategori, setFilterKategori] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   // Data dari service lain
   const [stats, setStats] = useState({ summary: null, kinerja: [] });
@@ -225,37 +256,53 @@ export default function DashboardSuperAdmin() {
     });
   };
 
-  const handleExportExcel = () => {
+  // Ekspor .xlsx asli (bukan CSV yang diberi nama .xlsx), supaya kolom tanggal
+  // dan usia tetap bertipe tanggal/angka di Excel — bisa langsung disortir dan
+  // difilter. Yang diekspor adalah data hasil filter yang sedang tampil.
+  const handleExportExcel = async () => {
     const data = getFilteredReports();
     if (data.length === 0) return alert('Tidak ada data untuk diekspor!');
 
-    let csv = 'Kode Laporan,Tanggal Kejadian,Nama Korban,Usia,Jenis Kelamin,Wilayah,Jenis Kekerasan,Kategori,Status,Kronologi\n';
+    const headerRow = EXPORT_COLUMNS.map(col => ({
+      value: col.header,
+      fontWeight: 'bold',
+      backgroundColor: '#1a56db',
+      textColor: '#ffffff',
+      align: 'center',
+      wrap: true,
+    }));
 
-    data.forEach(r => {
-      const escapeCSV = (str) => {
-        if (str === null || str === undefined) return '""';
-        const s = String(str);
-        if (s.includes(',') || s.includes('\n') || s.includes('"')) {
-          return `"${s.replace(/"/g, '""')}"`;
-        }
-        return `"${s}"`;
+    const bodyRows = data.map(r => {
+      const tgl = new Date(r.tanggal_kejadian);
+      const nilai = {
+        ...r,
+        tanggal: isNaN(tgl.getTime()) ? null : tgl,
+        usia_korban: Number.isFinite(Number(r.usia_korban)) ? Number(r.usia_korban) : null,
+        kategori: r.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan',
+        status: labelStatus(r.status),
       };
 
-      const d = new Date(r.tanggal_kejadian);
-      const tgl = isNaN(d.getTime()) ? '-' : (r.tanggal_kejadian_format || d.toLocaleDateString('id-ID'));
-      const kategori = r.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan';
-
-      csv += `${escapeCSV(r.kode_laporan)},${escapeCSV(tgl)},${escapeCSV(r.nama_korban)},${escapeCSV(r.usia_korban)},${escapeCSV(r.jenis_kelamin)},${escapeCSV(r.kelurahan_korban)},${escapeCSV(r.jenis_kekerasan)},${escapeCSV(kategori)},${escapeCSV(r.status)},${escapeCSV(r.kronologi)}\n`;
+      return EXPORT_COLUMNS.map(col => ({
+        value: nilai[col.key] ?? null,
+        type: col.type,
+        format: col.format,
+        align: col.align,
+        wrap: col.wrap,
+      }));
     });
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Data_Pelaporan_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    setExporting(true);
+    try {
+      await writeExcelFile([headerRow, ...bodyRows], {
+        sheet: 'Data Pelaporan',
+        columns: EXPORT_COLUMNS.map(col => ({ width: col.width })),
+        stickyRowsCount: 1, // baris judul tetap terlihat saat digulir
+      }).toFile(`Data_Pelaporan_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (err) {
+      alert('Gagal membuat file Excel: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (!user) return null;
@@ -500,19 +547,14 @@ export default function DashboardSuperAdmin() {
           </div>
         )}
 
-        {/* 4. TAB DATA PELAPORAN (filter + export CSV) */}
+        {/* 4. TAB DATA PELAPORAN (filter + export .xlsx) */}
         {activeMenu === 'export' && (
           <div className="modern-table-card">
-            {/* Toolbar */}
+            {/* Toolbar: judul di kiri, pencarian + filter + ekspor di kanan */}
             <div className="modern-table-toolbar">
-              <div className="d-flex align-items-center gap-3 flex-wrap">
-                <h6 className="modern-table-title">Data Pelaporan</h6>
-                <button className="btn btn-success btn-sm rounded-pill px-3 fw-bold" onClick={handleExportExcel}>
-                  <i className="bi bi-file-earmark-excel me-1"></i> Export Excel
-                </button>
-              </div>
+              <h6 className="modern-table-title">Data Pelaporan</h6>
+
               <div className="modern-table-controls">
-                {/* Search */}
                 <div className="modern-table-search">
                   <i className="bi bi-search search-icon"></i>
                   <input
@@ -522,43 +564,54 @@ export default function DashboardSuperAdmin() {
                     onChange={e => setSearchQuery(e.target.value)}
                   />
                 </div>
-                {/* Kategori filter pills */}
-                <div className="filter-pills">
-                  <button className={`filter-pill ${filterKategori === '' ? 'active' : ''}`} onClick={() => setFilterKategori('')}>Semua</button>
-                  <button className={`filter-pill ${filterKategori === 'anak' ? 'active' : ''}`} onClick={() => setFilterKategori('anak')}>Anak</button>
-                  <button className={`filter-pill ${filterKategori === 'perempuan' ? 'active' : ''}`} onClick={() => setFilterKategori('perempuan')}>Perempuan</button>
-                </div>
-                {/* Status filter pills */}
-                <div className="filter-pills">
-                  <button className={`filter-pill ${filterStatus === '' ? 'active' : ''}`} onClick={() => setFilterStatus('')}>Semua Status</button>
-                  <button className={`filter-pill ${filterStatus === 'menunggu_registrasi' ? 'active' : ''}`} onClick={() => setFilterStatus('menunggu_registrasi')}>Menunggu</button>
-                  <button className={`filter-pill ${filterStatus === 'penanganan' ? 'active' : ''}`} onClick={() => setFilterStatus('penanganan')}>Proses</button>
-                  <button className={`filter-pill ${filterStatus === 'selesai' ? 'active' : ''}`} onClick={() => setFilterStatus('selesai')}>Selesai</button>
-                </div>
-                {/* Reset */}
-                {(searchQuery || filterKategori || filterStatus || filterStartDate || filterEndDate || filterRegion) && (
-                  <button
-                    className="btn btn-sm btn-light text-muted rounded-pill px-3"
-                    onClick={() => { setSearchQuery(''); setFilterKategori(''); setFilterStatus(''); setFilterStartDate(''); setFilterEndDate(''); setFilterRegion(''); }}
-                  >
-                    <i className="bi bi-x-circle me-1"></i>Reset
-                  </button>
-                )}
+
+                <select className="toolbar-select" value={filterKategori} onChange={e => setFilterKategori(e.target.value)}>
+                  <option value="">Semua Kategori</option>
+                  <option value="anak">Anak</option>
+                  <option value="perempuan">Perempuan</option>
+                </select>
+
+                <select className="toolbar-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                  <option value="">Semua Status</option>
+                  <option value="menunggu_registrasi">Menunggu Registrasi</option>
+                  <option value="proses_assessment">Proses Assessment</option>
+                  <option value="dalam_penanganan">Dalam Penanganan</option>
+                  <option value="selesai">Selesai</option>
+                </select>
+
+                <button
+                  className="btn btn-success btn-sm rounded-pill px-3 fw-bold"
+                  onClick={handleExportExcel}
+                  disabled={exporting}
+                >
+                  <i className="bi bi-file-earmark-excel me-1"></i>
+                  {exporting ? 'Menyiapkan...' : 'Export Excel'}
+                </button>
               </div>
             </div>
 
-            {/* Date & Region filter row (secondary, subtle) */}
+            {/* Filter lanjutan: rentang tanggal & wilayah */}
             <div className="d-flex align-items-center gap-2 px-4 py-2 bg-light border-bottom flex-wrap">
               <small className="text-muted fw-bold me-1">Filter Lanjutan:</small>
               <input type="date" className="form-control form-control-sm rounded-pill" style={{ width: 'auto' }} value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
               <small className="text-muted">s/d</small>
               <input type="date" className="form-control form-control-sm rounded-pill" style={{ width: 'auto' }} value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
-              <select className="form-select form-select-sm rounded-pill" style={{ width: 'auto' }} value={filterRegion} onChange={e => setFilterRegion(e.target.value)}>
+              <select className="toolbar-select" value={filterRegion} onChange={e => setFilterRegion(e.target.value)}>
                 <option value="">Semua Wilayah</option>
                 {[...new Set(allReports.map(r => r.kelurahan_korban).filter(Boolean))].sort().map(reg => (
                   <option key={reg} value={reg}>{reg}</option>
                 ))}
               </select>
+
+              {(searchQuery || filterKategori || filterStatus || filterStartDate || filterEndDate || filterRegion) && (
+                <button
+                  className="btn btn-sm btn-light text-muted rounded-pill px-3"
+                  onClick={() => { setSearchQuery(''); setFilterKategori(''); setFilterStatus(''); setFilterStartDate(''); setFilterEndDate(''); setFilterRegion(''); }}
+                >
+                  <i className="bi bi-x-circle me-1"></i>Reset
+                </button>
+              )}
+
               <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1 ms-auto">
                 {getFilteredReports().length} data
               </span>

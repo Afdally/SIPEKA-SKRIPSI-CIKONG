@@ -5,9 +5,12 @@ exports.store = async (req, res) => {
   try {
     const data = req.body;
 
-    // Parse anonim if it's sent as string form data
     if (data.anonim === 'true') data.anonim = true;
     if (data.anonim === 'false') data.anonim = false;
+
+    // Dikirim sebagai string dari FormData, disamakan seperti `anonim` di atas
+    if (data.pernyataan_benar === 'true') data.pernyataan_benar = true;
+    if (data.pernyataan_benar === 'false') data.pernyataan_benar = false;
 
     if (data.anonim) {
       data.nama_pelapor = 'ANONIM';
@@ -95,10 +98,16 @@ exports.index = async (req, res) => {
 
     const laporans = await Laporan.find(filter).sort({ createdAt: -1 });
 
+    // `tanggal_kejadian` dibiarkan tetap ISO supaya di sisi klien masih bisa
+    // diurutkan, difilter rentang tanggal, dan diekspor sebagai tipe tanggal
+    // Excel. Versi siap-tampilnya dikirim terpisah sebagai *_format — dulu
+    // field ISO-nya ditimpa string "d/m/yyyy" sehingga `new Date()` di frontend
+    // selalu Invalid Date (tanggal di tabel jadi "-" dan filter tanggal diam-diam
+    // tidak menyaring apa pun).
     const data = laporans.map(l => ({
       ...l.toObject(),
       id: l._id,
-      tanggal_kejadian: l.tanggal_kejadian ? l.tanggal_kejadian.toLocaleDateString('id-ID') : '-',
+      tanggal_kejadian_format: l.tanggal_kejadian ? l.tanggal_kejadian.toLocaleDateString('id-ID') : '-',
       tanggal_lapor: l.createdAt.toLocaleDateString('id-ID'),
     }));
 

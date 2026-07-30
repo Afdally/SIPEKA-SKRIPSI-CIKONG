@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 
 const laporanController = require('../controllers/laporanController');
+const analisisController = require('../controllers/analisisController');
 const authMid = require('../middleware/auth');
 const roleMid = require('../middleware/role');
 
@@ -29,6 +30,9 @@ const upload = multer({ storage: storage, limits: { fileSize: 5 * 1024 * 1024 } 
 router.post('/', upload.single('bukti_file'), laporanController.store);
 router.get('/status/:kode', laporanController.cekStatus);
 router.get('/public-gis', laporanController.getPublicGis);
+// Bantu pelapor mengisi formulir dari cerita bebasnya (dipakai sebelum submit,
+// jadi harus publik seperti form pelaporannya sendiri)
+router.post('/analisis-kronologi', analisisController.analisisKronologi);
 
 // Auth Middleware untuk rute di bawah ini
 router.use(authMid);

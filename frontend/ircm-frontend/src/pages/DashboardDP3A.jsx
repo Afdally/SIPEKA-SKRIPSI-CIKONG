@@ -671,6 +671,18 @@ export default function DashboardDP3A() {
                           <label className="small text-muted d-block mb-1">No. Telp Pelapor (Untuk Verifikasi)</label>
                           <span className="fw-bold text-primary">{detailData.anonim ? '-' : (detailData.telepon_pelapor || '-')}</span>
                         </div>
+                        <div className="col-12">
+                          <label className="small text-muted d-block mb-1">Preferensi Pertemuan (Dipilih Pelapor)</label>
+                          {detailData.preferensi_layanan === 'Petugas Mendatangi Korban' ? (
+                            <span className="badge bg-warning bg-opacity-25 text-dark border border-warning border-opacity-50 px-2 py-1">
+                              <i className="bi bi-geo-alt-fill me-1"></i> Petugas Mendatangi Korban
+                            </span>
+                          ) : (
+                            <span className="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2 py-1">
+                              <i className="bi bi-building-fill me-1"></i> {detailData.preferensi_layanan || 'Datang ke UPTD'}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
