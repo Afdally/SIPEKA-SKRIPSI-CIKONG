@@ -1,26 +1,10 @@
-// Ekstraksi berbasis aturan (regex + pencocokan daftar tertutup).
-//
-// Dua perannya:
-//   1. Cadangan penuh kalau Ollama mati / kelewat lambat — pelapor tetap dapat
-//      bantuan pengisian, cuma lebih sederhana.
-//   2. Pengisi celah untuk field yang tidak berhasil diambil model.
-//
-// Yang ditangani di sini adalah hal-hal yang justru LEBIH andal dikerjakan kode
-// daripada model kecil: pencocokan daftar tertutup (kelurahan) dan hitung-hitungan
-// tanggal. Model 3B sering keliru menghitung "tiga bulan lalu".
 
 const { SEMUA_KELURAHAN } = require('../data/kelurahan');
 
 const HUBUNGAN_VALID = ['Orang Tua', 'Anak', 'Saudara', 'Suami/Istri', 'Tetangga', 'Teman', 'Diri Sendiri'];
 const JENIS_KELAMIN_VALID = ['Laki-laki', 'Perempuan'];
 
-// Kata yang sering dikira nama oleh model, padahal bukan.
-//
-// Sebutan kerabat mendominasi daftar ini karena itulah kekeliruan yang paling
-// sering terjadi: pelapor menulis "adek saya dipukuli", tidak menyebut nama
-// siapa pun, lalu model mengisi nama_korban dengan "adek". Kalau lolos, kata
-// itu masuk ke formulir sebagai nama korban dan ikut tersimpan sebagai data
-// resmi.
+
 const BUKAN_NAMA = new Set([
   // kata ganti & peran
   'sa', 's', 'ak', 'saya', 'aku', 'dia', 'ia', 'kami', 'kita', 'beliau',
@@ -51,14 +35,6 @@ const BULAN = {
   juli: 6, agustus: 7, september: 8, oktober: 9, november: 10, desember: 11,
 };
 
-// ─── Normalisasi ketikan singkat ───
-//
-// Pelapor sering menulis cepat dan disingkat ("adek s dipukuli sma bpkku di rmh
-// kmrn"). Tanpa dinormalkan, hampir semua pola di bawah gagal. Model bahasa
-// relatif tahan terhadap ini, tapi lapisan aturan tidak — dan lapisan aturan
-// justru yang dipakai saat Ollama mati, jadi di situ normalisasi paling penting.
-//
-// Hanya dipakai untuk MEMBACA. Teks asli pelapor tidak pernah diubah.
 
 const SINGKATAN = {
   // sapaan & kerabat
@@ -81,9 +57,7 @@ const SINGKATAN = {
   thn: 'tahun', bln: 'bulan', mgg: 'minggu',
 };
 
-// Kerabat + akhiran "-ku" -> "<kerabat> saya", supaya pola kepemilikan di bawah
-// ikut kena. Ditulis sebelum penggantian singkatan, jadi bentuk singkatnya
-// (bpkku) juga tertangani: "bpkku" -> "bpk saya" -> "bapak saya".
+
 const KERABAT_UNTUK_KU = [
   'bpk', 'bapak', 'bapa', 'pak', 'papa', 'papi', 'ayh', 'ayah',
   'ibu', 'ibuk', 'mama', 'mami', 'ortu', 'orang tua',
@@ -94,7 +68,6 @@ const KERABAT_UNTUK_KU = [
 function normalisasiTeks(teks) {
   let t = String(teks).toLowerCase();
 
-  // "bpkku" / "adikku" / "anakku" -> "<kerabat> saya"
   const polaKu = new RegExp(`\\b(${KERABAT_UNTUK_KU.join('|')})ku\\b`, 'g');
   t = t.replace(polaKu, '$1 saya');
 
@@ -124,21 +97,6 @@ function tebakUsia(teksAsli) {
   }
   return null;
 }
-
-// ─── Hubungan pelapor dengan korban ───
-
-// Menebak hubungan pelapor dengan KORBAN — pelapor sering bukan korbannya.
-//
-// Jebakan utamanya: kerabat yang disebut bisa berperan sebagai PELAKU, bukan
-// korban. Bandingkan tiga kalimat ini:
-//
-//   "anak saya dipukul gurunya"           anak = korban   -> Orang Tua
-//   "saya dipukul oleh ayah tiri saya"    ayah = pelaku   -> Diri Sendiri
-//   "adik saya dipukuli sama bapak saya"  adik = korban,
-//                                         bapak = pelaku  -> Saudara
-//
-// Penandanya: kerabat yang didahului "oleh"/"sama"/"dari" atau didahului kata
-// kekerasan ("dipukul bapak saya") itu pelaku, jadi diabaikan.
 
 const KERABAT_KE_HUBUNGAN = [
   ['anak|putra|putri',        'Orang Tua'],
