@@ -8,6 +8,7 @@ const masterRoutes = require('./src/routes/master');
 const authRoutes = require('./src/routes/auth');
 const { seedMetode } = require('./src/controllers/masterMetodeController');
 const seedAuth = require('./src/seedAuth');
+const { startEmailReminderWorker } = require('./src/services/emailReminderWorker');
 
 const app = express();
 app.use(cors());
@@ -26,6 +27,7 @@ mongoose.connect(MONGODB_URI)
     console.log('✅ MongoDB terhubung:', MONGODB_URI);
     await seedMetode(); // Auto-seeding master data
     await seedAuth();   // Auto-seeding default users
+    startEmailReminderWorker();
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Case Service berjalan di http://0.0.0.0:${PORT}`);
     });

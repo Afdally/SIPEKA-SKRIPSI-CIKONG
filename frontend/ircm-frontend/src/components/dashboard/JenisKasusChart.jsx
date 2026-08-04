@@ -9,6 +9,11 @@ const GRID_COLOR      = '#f3f4f6';
 const LABEL_COLOR     = '#9ca3af';
 const CHART_H         = 200;       // px tinggi area grafik
 const BAR_GAP         = 0.35;      // 35% lebar kolom untuk gap
+// Lebar kolom = lebar plot dibagi jumlah kategori, jadi makin sedikit kategori
+// makin lebar batangnya. Dengan satu kategori saja, satu batang memenuhi
+// seluruh grafik dan terlihat seperti blok warna, bukan diagram. Batas ini
+// menjaga bentuknya tetap wajar berapa pun jumlah datanya.
+const MAX_BAR_W       = 56;
 
 export default function JenisKasusChart({ data }) {
   const [hovered, setHovered] = useState(null);
@@ -43,8 +48,10 @@ export default function JenisKasusChart({ data }) {
   const plotH   = CHART_H;
 
   const colW    = plotW / chartData.length;
-  const barW    = colW * (1 - BAR_GAP);
-  const barOff  = colW * BAR_GAP * 0.5;
+  const barW    = Math.min(colW * (1 - BAR_GAP), MAX_BAR_W);
+  // Batang dipusatkan di kolomnya — kalau dibatasi MAX_BAR_W, sisa ruangnya
+  // harus dibagi rata kiri-kanan supaya tetap sejajar dengan label di bawahnya.
+  const barOff  = (colW - barW) / 2;
   const RADIUS  = 5;
 
   return (

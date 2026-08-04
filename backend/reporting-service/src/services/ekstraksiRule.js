@@ -18,6 +18,9 @@ const BUKAN_NAMA = new Set([
   'sepupu', 'kembaran', 'nenek', 'kakek', 'paman', 'om', 'bibi', 'tante',
   'keponakan', 'ponakan', 'cucu', 'menantu', 'mertua', 'ipar',
   'tetangga', 'teman', 'sahabat', 'guru', 'murid', 'atasan', 'majikan',
+  // CATATAN: kata tempat (rumah, sekolah, kos) ada di daftar ini karena bukan
+  // nama orang — tapi jangan dipakai menyaring lokasi_kejadian, di sana justru
+  // itulah jawaban yang benar. Untuk itu pakai TANPA_ISI di bawah.
   // kata kerja & kata umum yang sering tersangkut jadi "nama" pada laporan
   // pendek tanpa nama sama sekali — model kecil cenderung tetap mengisi field
   // daripada mengosongkannya, dan yang diambil biasanya kata di dekat "saya".
@@ -25,9 +28,19 @@ const BUKAN_NAMA = new Set([
   'kejadian', 'kekerasan', 'peristiwa', 'masalah', 'kasus',
   'rumah', 'sekolah', 'kos', 'kamar', 'tempat',
   'malam', 'pagi', 'siang', 'sore', 'tadi', 'kemarin', 'sekarang',
-  // penanda "tidak ada isinya"
+]);
+
+// Penanda "field ini tidak ada isinya", terpisah dari BUKAN_NAMA karena berlaku
+// untuk SEMUA field teks, bukan cuma nama.
+//
+// Model kecil enggan mengosongkan field: alih-alih membalas "", dia menulis
+// kalimat seperti "belum disebutkan" — yang kalau lolos akan terpasang di
+// formulir sebagai lokasi kejadian yang sesungguhnya.
+const TANPA_ISI = new Set([
   'tidak', 'tidak ada', 'tidak diketahui', 'tidak disebutkan', 'tidak disebut',
-  'kosong', 'null', 'none', 'n/a', '-', '--',
+  'belum disebutkan', 'belum diketahui', 'belum ada', 'belum jelas',
+  'tidak jelas', 'tidak spesifik', 'tidak dijelaskan', 'tidak tersedia',
+  'kosong', 'null', 'none', 'unknown', 'n/a', '-', '--',
 ]);
 
 const BULAN = {
@@ -41,7 +54,13 @@ const SINGKATAN = {
   bpk: 'bapak', bpa: 'bapak', bapa: 'bapak', pak: 'bapak',
   ayh: 'ayah', ibuk: 'ibu', bu: 'ibu', mama: 'ibu', mami: 'ibu',
   papa: 'bapak', papi: 'bapak', ortu: 'orang tua',
-  adek: 'adik', ade: 'adik', adk: 'adik', dek: 'adik',
+  // "dek" SENGAJA tidak dipetakan ke 'adik', beda dengan adek/ade/adk yang lebih
+  // panjang. Di logat sebagian daerah (termasuk Kendari), "dek" dipakai sebagai
+  // partikel akhir kalimat ("izin dek," ~ "izin dong,"), bukan menyebut adik.
+  // Kalau tetap dipetakan, "izin dek," berubah jadi "izin adik," dan penyaring
+  // hubungan salah menyimpulkan korbannya adik — padahal tidak disebut sama
+  // sekali. Kehilangan beberapa kasus "dek"=adik lebih aman daripada salah baca.
+  adek: 'adik', ade: 'adik', adk: 'adik',
   kk: 'kakak', kaka: 'kakak', kakk: 'kakak',
   tmn: 'teman', sdr: 'saudara', spupu: 'sepupu',
   // kata ganti
@@ -110,7 +129,10 @@ const KERABAT_KE_HUBUNGAN = [
 const KATA_KEKERASAN = /(pukul|tampar|tendang|ancam|leceh|paksa|aniaya|hina|cekik|cabul|perkosa|disebar|telantar|bentak)/;
 
 // Diuji terhadap potongan teks TEPAT SEBELUM sebutan kerabat.
-const PENANDA_PELAKU = /(?:\boleh|\bsama|\bdari|\w*(?:pukul|tampar|tendang|leceh|aniaya|ancam|hina|bentak|cabul|perkosa|cekik)\w*)\s+$/;
+// Sebutan setelah "dipukul (oleh) ..." adalah pelaku, sedangkan setelah kata
+// aktif sehari-hari "pukul adik" justru korban. Karena itu bentuk kata kerja
+// tanpa awalan `di-` tidak boleh dipakai sebagai penanda pelaku.
+const PENANDA_PELAKU = /(?:\boleh|\bsama|\bdari|\bdi\w*(?:pukul|tampar|tendang|leceh|aniaya|ancam|hina|bentak|cabul|perkosa|cekik)\w*|\bkena\s+(?:di)?(?:pukul|tampar|tendang|cekik|jambak|seret))\s+$/;
 
 // Pasangan dari PENANDA_PELAKU untuk kalimat AKTIF, diuji ke potongan teks TEPAT
 // SESUDAH sebutan kerabat: "istri saya sering mengancam saya".
@@ -132,9 +154,9 @@ const PENANDA_PELAKU = /(?:\boleh|\bsama|\bdari|\w*(?:pukul|tampar|tendang|leceh
 // kali: pada lapis longgar (wajibMilik=false) yang tercocok cuma "istri", jadi
 // "saya" masih tersisa di awal potongan.
 const MILIK = '(?:saya|aku|kami|kita|dia|nya|itu|tersebut)';
-const KETERANGAN = '(?:sering|selalu|kerap|suka|terus|sudah|sempat|pernah|kadang|kembali|lagi|juga|sekali|saja|itu|tersebut|yang|bahkan|malah|tiba-tiba)';
+const KETERANGAN = '(?:sering|selalu|kerap|suka|terus|sudah|sempat|pernah|kadang|kembali|lagi|juga|sekali|saja|itu|tersebut|yang|bahkan|malah|tiba-tiba|kemarin|tadi)';
 const PENANDA_PELAKU_AKTIF = new RegExp(
-  `^\\s+(?:${MILIK}\\s+)?(?:${KETERANGAN}\\s+){0,3}(?:memukul|menampar|menendang|mengancam|menghina|membentak|melecehkan|menganiaya|mencekik|memperkosa|mencabuli|menelantarkan|memaki|merendahkan|menjambak|membanting|menyeret|meneror|mempermalukan)\\b`
+  `^\\s+(?:${MILIK}\\s+)?(?:${KETERANGAN}\\s+){0,3}(?:memukul|menampar|menendang|mengancam|menghina|membentak|melecehkan|menganiaya|mencekik|memperkosa|mencabuli|menelantarkan|memaki|merendahkan|menjambak|membanting|menyeret|meneror|mempermalukan|pukul|tampar|tendang|ancam|hina|bentak|cekik|jambak|seret)\\b`
 );
 
 // Cari sebutan kerabat yang berperan sebagai korban. `wajibMilik` = hanya terima
@@ -287,9 +309,15 @@ const KAMUS_KEKERASAN = {
   'Kekerasan Seksual': ['leceh', 'perkosa', 'seksual', 'dipaksa berhubungan', 'diremas', 'cabul',
                         'senonoh', 'digagahi', 'disetubuhi', 'ditelanjangi', 'diraba'],
   'Kekerasan Fisik':   ['pukul', 'tampar', 'tendang', 'lempar', 'cekik', 'seret', 'dianiaya', 'jambak', 'dibanting'],
+  // Diperiksa SEBELUM Kekerasan Psikis dengan sengaja. Kata kuncinya lebih
+  // spesifik konteksnya (medsos, whatsapp, diunggah) dibanding "hina"/"bentak"/
+  // "ancam" yang generik dan bisa muncul di laporan jenis apa pun. Kalau
+  // urutannya dibalik, cerita perundungan online yang kebetulan memuat kata
+  // "dihina" berhenti di Psikis duluan, padahal kata kunci yang lebih spesifik
+  // (grup WA, foto disebar) menunjuk jelas ke Cyberbullying.
+  'Cyberbullying':     ['media sosial', 'medsos', 'whatsapp', 'online', 'diunggah', 'disebar', 'foto saya disebar'],
   'Kekerasan Psikis':  ['ancam', 'bentak', 'hina', 'trauma', 'teror', 'dipermalukan', 'dimaki', 'direndahkan'],
   'Penelantaran':      ['telantar', 'tidak diberi makan', 'ditinggal', 'diabaikan', 'tidak dinafkahi'],
-  'Cyberbullying':     ['media sosial', 'medsos', 'whatsapp', 'online', 'diunggah', 'disebar', 'foto saya disebar'],
   'KDRT':              ['rumah tangga', 'kdrt'],
 };
 
@@ -414,7 +442,7 @@ function bersihkanNama(nilai) {
   // Kata milik yang ikut terbawa dibuang dulu, supaya "adik saya" tetap
   // tersaring oleh daftar di bawah dan tidak lolos hanya karena ada "saya".
   const inti = s.toLowerCase().replace(/\s+(saya|aku|kami|kita|nya|itu|tersebut)$/, '').trim();
-  if (BUKAN_NAMA.has(inti)) return null;
+  if (BUKAN_NAMA.has(inti) || TANPA_ISI.has(inti)) return null;
 
   return s;
 }
@@ -430,11 +458,15 @@ function bersihkanUsia(nilai) {
   return Number.isInteger(n) && n > 0 && n <= 120 ? n : null;
 }
 
+// Dipakai untuk lokasi_kejadian. Sengaja TIDAK memakai BUKAN_NAMA: daftar itu
+// memuat kata tempat seperti "rumah" dan "sekolah" — benar sebagai penyaring
+// nama orang, tapi di sini justru itulah jawaban yang paling sering dan paling
+// tepat.
 function bersihkanTeksPendek(nilai, maks = 120) {
   if (!nilai) return null;
   const s = String(nilai).trim();
   if (!s || s.length > maks) return null;
-  if (BUKAN_NAMA.has(s.toLowerCase())) return null;
+  if (TANPA_ISI.has(s.toLowerCase())) return null;
   return s;
 }
 

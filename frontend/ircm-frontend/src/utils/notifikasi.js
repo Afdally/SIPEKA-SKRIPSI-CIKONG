@@ -44,6 +44,18 @@ export function toastSukses(pesan) {
   })
 }
 
+export function toastInfo(pesan) {
+  return Swal.fire({
+    toast: true,
+    position: 'top-end',
+    icon: 'info',
+    title: pesan,
+    showConfirmButton: false,
+    timer: 4500,
+    timerProgressBar: true,
+  })
+}
+
 // Mengembalikan true kalau pengguna menekan tombol setuju.
 //
 // PENTING: tidak seperti confirm() bawaan yang menghentikan eksekusi, ini

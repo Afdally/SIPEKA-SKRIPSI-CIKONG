@@ -29,10 +29,10 @@ exports.show = async (req, res) => {
 exports.registrasi = async (req, res) => {
   try {
     const user = req.auth_user;
-    const { laporan_id, kode_laporan, pesan_tindak_lanjut } = req.body;
+    const { laporan_id, kode_laporan, pesan_tindak_lanjut, metode_pertemuan } = req.body;
 
-    if (!laporan_id || !kode_laporan || !pesan_tindak_lanjut) {
-      return res.status(422).json({ message: 'laporan_id, kode_laporan, dan pesan_tindak_lanjut wajib diisi' });
+    if (!laporan_id || !kode_laporan || !pesan_tindak_lanjut || !metode_pertemuan) {
+      return res.status(422).json({ message: 'laporan_id, kode_laporan, pesan_tindak_lanjut, dan metode_pertemuan wajib diisi' });
     }
 
     // Cek apakah laporan sudah pernah diregistrasi
@@ -47,6 +47,7 @@ exports.registrasi = async (req, res) => {
       petugas_id:          user.id || user.sub,
       petugas_name:        user.name,
       pesan_tindak_lanjut,
+      metode_pertemuan,
       tanggal_registrasi:  new Date(),
       status:              'registrasi',
     });

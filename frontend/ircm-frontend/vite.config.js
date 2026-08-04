@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // Panggilan ke /api dan /storage diteruskan dev server ini ke api-gateway, jadi
@@ -14,20 +14,23 @@ import react from '@vitejs/plugin-react'
 // menjalankan (lihat dua opsi di README):
 //   - lewat Docker : gateway dikenal sebagai host "api-gateway" di jaringan compose
 //   - npm run dev  : gateway ada di localhost:8080 dari sudut pandang PC
-const targetBackend = process.env.VITE_PROXY_TARGET || 'http://localhost:8080'
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, '.', '')
+  const apiGatewayTarget = env.API_GATEWAY_TARGET || 'http://localhost:8080'
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: '0.0.0.0',
-    port: 80,
-    watch: {
-      usePolling: true,
+  return {
+    plugins: [react()],
+    server: {
+      host: '0.0.0.0',
+      port: 80,
+      watch: {
+        usePolling: true,
+      },
+      proxy: {
+        '/api': { target: apiGatewayTarget, changeOrigin: true },
+        // Foto/dokumen bukti laporan, dilayani report-service lewat gateway
+        '/storage': { target: apiGatewayTarget, changeOrigin: true },
+      },
     },
-    proxy: {
-      '/api': { target: targetBackend, changeOrigin: true },
-      // Foto/dokumen bukti laporan, dilayani report-service lewat gateway
-      '/storage': { target: targetBackend, changeOrigin: true },
-    },
-  },
+  }
 })

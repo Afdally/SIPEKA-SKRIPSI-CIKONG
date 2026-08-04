@@ -9,7 +9,6 @@ const R_OUTER = 72;
 const R_INNER = 44;   // lubang tengah donut
 const CX = 90;
 const CY = 90;
-const CIRC  = 2 * Math.PI * ((R_OUTER + R_INNER) / 2);
 
 export default function DemografiChart({ data }) {
   const [hovered, setHovered] = useState(null);
@@ -27,7 +26,8 @@ export default function DemografiChart({ data }) {
     }
   });
 
-  const total = anakPerempuan + anakLakiLaki + dewasaPerempuan || 1;
+  const totalAktual = anakPerempuan + anakLakiLaki + dewasaPerempuan;
+  const totalPerhitungan = totalAktual || 1;
   const donutData = [
     { label: 'Perempuan Dewasa', value: dewasaPerempuan, color: COLORS[0] },
     { label: 'Anak Perempuan',   value: anakPerempuan,   color: COLORS[1] },
@@ -38,14 +38,13 @@ export default function DemografiChart({ data }) {
   const STROKE_W  = R_OUTER - R_INNER;
   const r         = (R_OUTER + R_INNER) / 2;
   const circumf   = 2 * Math.PI * r;
-  const GAP       = 3; // px gap antar segmen
 
   // Build segments
   let accumulated = 0;
   const segments = donutData.map((d, i) => {
-    const frac      = d.value / total;
-    const arcLen    = frac * circumf - GAP;
-    const offset    = circumf - accumulated;
+    const frac      = d.value / totalPerhitungan;
+    const arcLen    = frac * circumf;
+    const offset    = accumulated;
     const seg       = { ...d, frac, arcLen, offset, idx: i };
     accumulated    += frac * circumf;
     return seg;
@@ -92,8 +91,8 @@ export default function DemografiChart({ data }) {
                 stroke={seg.color}
                 strokeWidth={hovered === seg.idx ? STROKE_W + 5 : STROKE_W}
                 strokeDasharray={`${seg.arcLen} ${circumf}`}
-                strokeDashoffset={-seg.offset + circumf}
-                strokeLinecap="round"
+                strokeDashoffset={-seg.offset}
+                strokeLinecap="butt"
                 style={{
                   cursor: 'pointer',
                   transition: 'stroke-width 0.2s, stroke-dashoffset 0.4s',
@@ -130,7 +129,7 @@ export default function DemografiChart({ data }) {
             ) : (
               <>
                 <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#111827', lineHeight: 1 }}>
-                  {anakPerempuan + anakLakiLaki + dewasaPerempuan}
+                  {totalAktual}
                 </span>
                 <span style={{ fontSize: '0.65rem', color: '#9ca3af', marginTop: 4 }}>Total</span>
               </>
@@ -141,7 +140,7 @@ export default function DemografiChart({ data }) {
         {/* Legend */}
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {donutData.map((d, i) => {
-            const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
+            const pct = totalAktual > 0 ? Math.round((d.value / totalAktual) * 100) : 0;
             return (
               <div
                 key={i}

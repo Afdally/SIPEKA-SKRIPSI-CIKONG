@@ -1,15 +1,20 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import laporanService from '../services/laporanService';
 import kasusService from '../services/kasusService';
+import { gatewayAssetUrl } from '../services/apiClient';
 import StatCard from '../components/dashboard/StatCard';
-import JenisKasusChart from '../components/dashboard/JenisKasusChart';
+import SebaranKelurahanChart from '../components/dashboard/SebaranKelurahanChart';
 import DemografiChart from '../components/dashboard/DemografiChart';
-import { beriTahuGagal, beriTahuKurang, konfirmasi } from '../utils/notifikasi';
+import SidebarUserMenu from '../components/dashboard/SidebarUserMenu';
+import { beriTahuGagal, beriTahuKurang, konfirmasi, toastInfo, toastSukses } from '../utils/notifikasi';
+import { pilihLaporanBelumDiregistrasi } from '../utils/laporanBaru';
+import { cocokDenganFilterKategori, kategoriKorban } from '../utils/kategoriKorban';
 import './Dashboard.css';
 
 const METODE_LIST = ['Konsultasi / Mediasi', 'Psikososial', 'Bantuan Hukum'];
+const METODE_PERTEMUAN_LIST = ['Datang ke UPTD', 'Petugas Mendatangi Korban'];
 
 const MENU_ITEMS = [
   { id: 'beranda', icon: 'bi-grid-1x2-fill', label: 'Dashboard' },
@@ -32,7 +37,7 @@ export default function DashboardDP3A() {
   // ==================== STATE ====================
 
   const [user, setUser] = useState(null);
-  const [activeMenu, setActiveMenu] = useState('penanganan');
+  const [activeMenu, setActiveMenu] = useState('beranda');
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'detail'
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -46,10 +51,15 @@ export default function DashboardDP3A() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [activeAction, setActiveAction] = useState('detail');
   const [filterKategori, setFilterKategori] = useState('');
+  const [hanyaLaporanBaru, setHanyaLaporanBaru] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [bannerLaporanDitutup, setBannerLaporanDitutup] = useState(false);
+  const jumlahLaporanBaruSebelumnya = useRef(null);
+  const generasiFetch = useRef(0);
 
   // State form tiap tahap penanganan
   const [pesanTindakLanjut, setPesanTindakLanjut] = useState('');
+  const [metodePertemuan, setMetodePertemuan] = useState('');
   const [hasilAssessment, setHasilAssessment] = useState('');
   const [kondisiKorban, setKondisiKorban] = useState('');
   const [kebutuhanKorban, setKebutuhanKorban] = useState('');
@@ -62,14 +72,23 @@ export default function DashboardDP3A() {
   // ==================== DATA FETCHING ====================
 
   const fetchAll = useCallback(async (tok) => {
+    const generasi = ++generasiFetch.current;
     setLoading(true);
     try {
       const [reportsData, kasusData] = await Promise.all([
         laporanService.getAll(tok || getToken()),
         kasusService.getAll(tok || getToken()),
       ]);
+      if (generasi !== generasiFetch.current) return;
       setReports(reportsData || []);
       setKasusList(kasusData || []);
+
+      const jumlahBaru = (reportsData || []).filter(r => r.status === 'menunggu_registrasi').length;
+      if (jumlahLaporanBaruSebelumnya.current !== null && jumlahBaru > jumlahLaporanBaruSebelumnya.current) {
+        toastInfo(`Ada ${jumlahBaru - jumlahLaporanBaruSebelumnya.current} laporan baru yang masuk.`);
+        setBannerLaporanDitutup(false);
+      }
+      jumlahLaporanBaruSebelumnya.current = jumlahBaru;
     } catch (err) {
       console.error(err);
       if (err.response?.status === 401) {
@@ -77,7 +96,7 @@ export default function DashboardDP3A() {
         navigate('/login');
       }
     } finally {
-      setLoading(false);
+      if (generasi === generasiFetch.current) setLoading(false);
     }
   }, [navigate]);
 
@@ -88,6 +107,12 @@ export default function DashboardDP3A() {
     setUser(JSON.parse(rawUser));
     fetchAll(tok);
   }, [navigate, fetchAll]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    const intervalId = window.setInterval(() => fetchAll(), 60_000);
+    return () => window.clearInterval(intervalId);
+  }, [user, fetchAll]);
 
   const handleLogout = async () => {
     if (!await konfirmasi('Keluar dari dashboard?', { teksSetuju: 'Ya, keluar' })) return;
@@ -100,13 +125,33 @@ export default function DashboardDP3A() {
 
   const submitRegistrasi = async () => {
     if (!pesanTindakLanjut) return beriTahuKurang('Pesan tindak lanjut wajib diisi');
+    if (!metodePertemuan) return beriTahuKurang('Metode pertemuan wajib dikonfirmasi');
     setSubmitting(true);
     try {
-      await kasusService.registrasi(getToken(), {
+      const hasilRegistrasi = await kasusService.registrasi(getToken(), {
         laporan_id: selectedItem._id || selectedItem.id,
         kode_laporan: selectedItem.kode_laporan,
-        pesan_tindak_lanjut: pesanTindakLanjut
+        pesan_tindak_lanjut: pesanTindakLanjut,
+        metode_pertemuan: metodePertemuan
       });
+
+      // Respons Case Service sudah menjadi sumber kebenaran bahwa registrasi
+      // berhasil. Perbarui tampilan langsung tanpa menunggu event RabbitMQ
+      // menyinkronkan status salinan laporan di Reporting Service.
+      const kasusBaru = hasilRegistrasi.kasus;
+      if (kasusBaru) {
+        // Batalkan hak commit fetch/polling yang dimulai sebelum mutasi ini.
+        generasiFetch.current += 1;
+        setKasusList(sebelumnya => [
+          kasusBaru,
+          ...sebelumnya.filter(kasus => kasus._id !== kasusBaru._id),
+        ]);
+        setReports(sebelumnya => sebelumnya.map(report =>
+          String(report._id || report.id) === String(kasusBaru.laporan_id)
+            ? { ...report, status: 'proses_assessment' }
+            : report,
+        ));
+      }
       setViewMode('list');
       fetchAll();
     } catch (err) {
@@ -155,9 +200,18 @@ export default function DashboardDP3A() {
     if (!catatanLog) return beriTahuKurang('Catatan log wajib diisi');
     setSubmitting(true);
     try {
-      await kasusService.addLog(getToken(), selectedItem._id, { catatan: catatanLog });
-      setViewMode('list');
-      fetchAll();
+      const hasil = await kasusService.addLog(getToken(), selectedItem._id, { catatan: catatanLog });
+      const kasusDiperbarui = hasil.kasus;
+
+      if (kasusDiperbarui) {
+        setKasusList(sebelumnya => sebelumnya.map(kasus =>
+          kasus._id === kasusDiperbarui._id ? kasusDiperbarui : kasus,
+        ));
+        setSelectedItem(sebelumnya => ({ ...sebelumnya, ...kasusDiperbarui }));
+      }
+
+      setCatatanLog('');
+      toastSukses('Log progress berhasil disimpan.');
     } catch (err) {
       beriTahuGagal(err.response?.data?.message || 'Terjadi kesalahan pada sistem.');
     } finally {
@@ -203,7 +257,7 @@ export default function DashboardDP3A() {
     };
   };
 
-  const lapBaru = reports.filter(r => r.status === 'menunggu_registrasi');
+  const lapBaru = pilihLaporanBelumDiregistrasi(reports, kasusList);
   const kasAktif = kasusList.filter(k => k.status !== 'selesai').map(enrichKasus);
 
   // Gabungan laporan yang belum diregistrasi + kasus yang masih aktif, untuk tab "Penanganan Kasus"
@@ -221,7 +275,8 @@ export default function DashboardDP3A() {
 
   // Filter kategori (Anak/Perempuan) khusus untuk tampilan tabel, tidak mengubah data asli
   const filteredActiveList = allActiveList.filter(item => {
-    if (filterKategori && item.tipe_laporan !== filterKategori) return false;
+    if (hanyaLaporanBaru && item.listType !== 'laporan') return false;
+    if (!cocokDenganFilterKategori(item, filterKategori)) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const match =
@@ -233,7 +288,7 @@ export default function DashboardDP3A() {
     return true;
   });
   const filteredKasSels = kasSels.filter(k => {
-    if (filterKategori && k.tipe_laporan !== filterKategori) return false;
+    if (!cocokDenganFilterKategori(k, filterKategori)) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const match =
@@ -260,6 +315,7 @@ export default function DashboardDP3A() {
     if (item.listType === 'laporan' || item.status === 'menunggu_registrasi') {
       setActiveAction('registrasi');
       setPesanTindakLanjut('');
+      setMetodePertemuan(item.preferensi_layanan || '');
     } else if (item.status === 'registrasi') {
       setActiveAction('assessment');
       setHasilAssessment(''); setKondisiKorban(''); setKebutuhanKorban('');
@@ -281,6 +337,39 @@ export default function DashboardDP3A() {
   const getInitials = (name) => {
     if (!name) return '-';
     return name.split(' ').map(n => n[0]).join('.').toUpperCase() + '.';
+  };
+
+  const waktuRelatif = (tanggal) => {
+    const selisihMenit = Math.max(0, Math.floor((Date.now() - new Date(tanggal).getTime()) / 60_000));
+    if (selisihMenit < 1) return 'Baru saja';
+    if (selisihMenit < 60) return `${selisihMenit} menit lalu`;
+    const jam = Math.floor(selisihMenit / 60);
+    if (jam < 24) return `${jam} jam lalu`;
+    return `${Math.floor(jam / 24)} hari lalu`;
+  };
+
+  const lihatLaporanBaru = () => {
+    setActiveMenu('penanganan');
+    setViewMode('list');
+    setHanyaLaporanBaru(true);
+    setFilterKategori('');
+    setSearchQuery('');
+  };
+
+  const normalizeNomorWhatsApp = (nomor) => {
+    const digit = String(nomor || '').replace(/\D/g, '');
+    if (digit.startsWith('0')) return `62${digit.slice(1)}`;
+    if (digit.startsWith('62')) return digit;
+    if (digit.startsWith('8')) return `62${digit}`;
+    return digit;
+  };
+
+  const hubungiViaWhatsApp = (nomor) => {
+    const nomorWhatsApp = normalizeNomorWhatsApp(nomor);
+    if (!nomorWhatsApp) return beriTahuKurang('Nomor WhatsApp pelapor tidak tersedia');
+
+    const pesan = 'Halo, kami petugas UPTD PPA. Kami menghubungi Anda untuk menindaklanjuti laporan yang telah dikirim. Apakah saat ini aman bagi Anda untuk berkomunikasi melalui WhatsApp?';
+    window.open(`https://wa.me/${nomorWhatsApp}?text=${encodeURIComponent(pesan)}`, '_blank', 'noopener,noreferrer');
   };
 
   // Posisi stepper di halaman detail: index 0-5 sesuai STEP_STAGES
@@ -325,13 +414,11 @@ export default function DashboardDP3A() {
           {MENU_ITEMS.map(item => (
             <div key={item.id} className={`dashboard-nav-link${activeMenu === item.id && viewMode === 'list' ? ' active' : ''}`} onClick={() => { setActiveMenu(item.id); setViewMode('list'); fetchAll(); setSidebarOpen(false); }}>
               <i className={`bi ${item.icon}`}></i> {item.label}
-              {item.id === 'penanganan' && allActiveList.length > 0 && <span className="badge bg-danger text-white ms-auto rounded-pill">{allActiveList.length}</span>}
+              {item.id === 'penanganan' && lapBaru.length > 0 && <span className="badge bg-danger text-white ms-auto rounded-pill">{lapBaru.length} baru</span>}
             </div>
           ))}
         </nav>
-        <div style={{ padding: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <button className="btn btn-sm w-100 fw-bold text-white border-secondary rounded-pill" onClick={handleLogout}><i className="bi bi-box-arrow-right me-2"></i>Keluar</button>
-        </div>
+        <SidebarUserMenu user={user} roleLabel="Petugas UPTD" onLogout={handleLogout} />
       </div>
 
       {/* MAIN CONTENT */}
@@ -350,52 +437,31 @@ export default function DashboardDP3A() {
               {viewMode === 'detail' ? 'Detail Laporan' : MENU_ITEMS.find(m => m.id === activeMenu)?.label}
             </h5>
           </div>
-          <div className="dropdown">
-            <button
-              className="user-avatar-btn dropdown-toggle"
-              type="button"
-              id="userDropdownDP3A"
-              data-bs-toggle="dropdown"
-              aria-expanded="false"
-            >
-              <div className="user-avatar-circle">
-                {user?.name?.charAt(0).toUpperCase()}
-              </div>
-              <span className="user-avatar-name">{user?.name}</span>
-              <i className="bi bi-chevron-down user-avatar-chevron"></i>
-            </button>
-            <div className="dropdown-menu dropdown-menu-end user-dropdown-menu" aria-labelledby="userDropdownDP3A">
-              {/* Header: info user */}
-              <div className="user-dropdown-header">
-                <div className="user-dropdown-avatar">
-                  {user?.name?.charAt(0).toUpperCase()}
-                </div>
-                <div className="user-dropdown-info">
-                  <div className="user-dropdown-name">{user?.name}</div>
-                  <div className="user-dropdown-email">{user?.email}</div>
-                  <span className="user-dropdown-role">Petugas UPTD</span>
-                </div>
-              </div>
-              {/* Menu items */}
-              <div className="user-dropdown-body">
-                <button className="user-dropdown-item">
-                  <i className="bi bi-person"></i> Profil Saya
-                </button>
-                <button className="user-dropdown-item">
-                  <i className="bi bi-gear"></i> Pengaturan
-                </button>
-              </div>
-              {/* Sign out */}
-              <button className="user-dropdown-signout" onClick={handleLogout}>
-                <i className="bi bi-box-arrow-right"></i> Keluar
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* LIST MODE */}
         {viewMode === 'list' && (
           <>
+            {lapBaru.length > 0 && activeMenu === 'beranda' && !bannerLaporanDitutup && (
+              <div className="alert alert-warning border-warning border-opacity-50 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 rounded-4 shadow-sm mb-4 new-report-banner" role="alert">
+                <button type="button" className="new-report-banner-close" onClick={() => setBannerLaporanDitutup(true)} aria-label="Tutup pemberitahuan laporan baru" title="Tutup">
+                  <i className="bi bi-x-lg" aria-hidden="true"></i>
+                </button>
+                <div className="d-flex align-items-start gap-3">
+                  <div className="rounded-circle bg-warning bg-opacity-25 d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '44px', height: '44px' }}>
+                    <i className="bi bi-bell-fill text-warning-emphasis fs-5"></i>
+                  </div>
+                  <div>
+                    <div className="fw-bold text-dark">Ada {lapBaru.length} laporan baru yang perlu ditindaklanjuti</div>
+                    <div className="small text-muted">Laporan tertua masuk {waktuRelatif(lapBaru[lapBaru.length - 1]?.createdAt)}.</div>
+                  </div>
+                </div>
+                <button type="button" className="btn btn-warning fw-bold rounded-3 px-4 flex-shrink-0" onClick={lihatLaporanBaru}>
+                  Lihat Laporan Baru <i className="bi bi-arrow-right ms-1"></i>
+                </button>
+              </div>
+            )}
+
             {activeMenu === 'beranda' && (() => {
               const allDataForCharts = [...lapBaru, ...kasAktif, ...kasSels];
 
@@ -409,7 +475,7 @@ export default function DashboardDP3A() {
                   </div>
 
                   <div className="row g-4 mb-4">
-                    <div className="col-lg-8"><JenisKasusChart data={allDataForCharts} /></div>
+                    <div className="col-lg-8"><SebaranKelurahanChart data={allDataForCharts} /></div>
                     <div className="col-lg-4"><DemografiChart data={allDataForCharts} /></div>
                   </div>
 
@@ -463,17 +529,19 @@ export default function DashboardDP3A() {
                     </div>
                     {/* Kategori filter pills */}
                     <div className="filter-pills">
-                      <button className={`filter-pill ${filterKategori === '' ? 'active' : ''}`} onClick={() => setFilterKategori('')}>Semua</button>
-                      <button className={`filter-pill ${filterKategori === 'anak' ? 'active' : ''}`} onClick={() => setFilterKategori('anak')}>Anak</button>
-                      <button className={`filter-pill ${filterKategori === 'perempuan' ? 'active' : ''}`} onClick={() => setFilterKategori('perempuan')}>Perempuan</button>
+                      <button className={`filter-pill ${filterKategori === '' && !hanyaLaporanBaru ? 'active' : ''}`} onClick={() => { setFilterKategori(''); setHanyaLaporanBaru(false); }}>Semua</button>
+                      <button className={`filter-pill ${hanyaLaporanBaru ? 'active' : ''}`} onClick={() => { setHanyaLaporanBaru(true); setFilterKategori(''); }}>Baru ({lapBaru.length})</button>
+                      <button className={`filter-pill ${filterKategori === 'anak' && !hanyaLaporanBaru ? 'active' : ''}`} onClick={() => { setFilterKategori('anak'); setHanyaLaporanBaru(false); }}>Anak</button>
+                      <button className={`filter-pill ${filterKategori === 'perempuan' && !hanyaLaporanBaru ? 'active' : ''}`} onClick={() => { setFilterKategori('perempuan'); setHanyaLaporanBaru(false); }}>Perempuan</button>
                     </div>
                     {/* Badge count */}
                     <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1">{filteredActiveList.length} Data</span>
+                    {loading && <span className="small text-muted"><span className="spinner-border spinner-border-sm me-1"></span>Memperbarui</span>}
                     {/* Reset */}
-                    {(searchQuery || filterKategori) && (
+                    {(searchQuery || filterKategori || hanyaLaporanBaru) && (
                       <button
                         className="btn btn-sm btn-light text-muted rounded-pill px-3"
-                        onClick={() => { setSearchQuery(''); setFilterKategori(''); }}
+                        onClick={() => { setSearchQuery(''); setFilterKategori(''); setHanyaLaporanBaru(false); }}
                       >
                         <i className="bi bi-x-circle me-1"></i>Reset
                       </button>
@@ -500,13 +568,21 @@ export default function DashboardDP3A() {
                             <td>
                               <div className="fw-bold text-dark">{item.kode_laporan}</div>
                               <div className="small text-muted">{new Date(item.createdAt || item.tanggal_registrasi).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                              {item.listType === 'laporan' && (
+                                <div className="mt-1 d-flex flex-wrap align-items-center gap-1">
+                                  <span className="badge bg-danger rounded-pill">BARU</span>
+                                  <span className="small text-danger fw-semibold">{waktuRelatif(item.createdAt)}</span>
+                                </div>
+                              )}
                             </td>
                             <td><span className="fw-semibold">{getInitials(item.nama_pelapor || (item.anonim ? 'Anonim' : '-'))}</span></td>
                             <td><span className="fw-semibold">{getInitials(item.nama_korban)}</span> <span className="small text-muted">({item.jenis_kelamin?.charAt(0)})</span></td>
                             <td>
-                              <span className={`status-pill ${item.tipe_laporan === 'anak' ? 'status-pill-warning' : 'status-pill-info'}`}>
-                                {item.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan'}
-                              </span>
+                              {kategoriKorban(item).map(kategori => (
+                                <span key={kategori} className={`status-pill me-1 ${kategori === 'anak' ? 'status-pill-warning' : 'status-pill-info'}`}>
+                                  {kategori === 'anak' ? 'Anak' : 'Perempuan'}
+                                </span>
+                              ))}
                             </td>
                             <td>
                               <span className="badge-soft badge-soft-primary">
@@ -581,9 +657,11 @@ export default function DashboardDP3A() {
                               <div className="fw-bold">{getInitials(k.nama_korban)}</div>
                             </td>
                             <td>
-                              <span className={`status-pill ${k.tipe_laporan === 'anak' ? 'status-pill-warning' : 'status-pill-info'}`}>
-                                {k.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan'}
-                              </span>
+                              {kategoriKorban(k).map(kategori => (
+                                <span key={kategori} className={`status-pill me-1 ${kategori === 'anak' ? 'status-pill-warning' : 'status-pill-info'}`}>
+                                  {kategori === 'anak' ? 'Anak' : 'Perempuan'}
+                                </span>
+                              ))}
                             </td>
                             <td><span className="fw-semibold small">{k.metode_penanganan}</span></td>
                             <td>
@@ -673,8 +751,20 @@ export default function DashboardDP3A() {
                           <span className="fw-bold">Data tidak tersedia</span>
                         </div>
                         <div className="col-12">
-                          <label className="small text-muted d-block mb-1">No. Telp Pelapor (Untuk Verifikasi)</label>
-                          <span className="fw-bold text-primary">{detailData.anonim ? '-' : (detailData.telepon_pelapor || '-')}</span>
+                          <label className="small text-muted d-block mb-2">Kontak Pelapor (Untuk Tindak Lanjut)</label>
+                          <div className="d-flex flex-wrap align-items-center gap-2">
+                            <span className="fw-bold text-primary">{detailData.telepon_pelapor || '-'}</span>
+                            {detailData.telepon_pelapor && (
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-success fw-bold rounded-3 px-3"
+                                onClick={() => hubungiViaWhatsApp(detailData.telepon_pelapor)}
+                              >
+                                <i className="bi bi-whatsapp me-1"></i> Hubungi via WhatsApp
+                              </button>
+                            )}
+                          </div>
+                          <small className="text-muted d-block mt-2">Pastikan kondisi pelapor aman sebelum membahas laporan.</small>
                         </div>
                         <div className="col-12">
                           <label className="small text-muted d-block mb-1">Preferensi Pertemuan (Dipilih Pelapor)</label>
@@ -688,6 +778,14 @@ export default function DashboardDP3A() {
                             </span>
                           )}
                         </div>
+                        {detailData.metode_pertemuan && (
+                          <div className="col-12">
+                            <label className="small text-muted d-block mb-1">Metode Pertemuan (Hasil Konfirmasi)</label>
+                            <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2 py-1">
+                              <i className="bi bi-check-circle-fill me-1"></i> {detailData.metode_pertemuan}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -715,19 +813,19 @@ export default function DashboardDP3A() {
                         ) : (
                           <div className="mt-2 border rounded p-2 bg-light text-center">
                             {detailData.bukti_file.toLowerCase().match(/\.(jpeg|jpg|gif|png)$/) ? (
-                              <a href={`/${detailData.bukti_file}`} target="_blank" rel="noreferrer">
-                                <img src={`/${detailData.bukti_file}`} alt="Bukti Terlampir" className="img-fluid rounded border" style={{ maxHeight: '300px', objectFit: 'contain' }} />
+                              <a href={gatewayAssetUrl(detailData.bukti_file)} target="_blank" rel="noreferrer">
+                                <img src={gatewayAssetUrl(detailData.bukti_file)} alt="Bukti Terlampir" className="img-fluid rounded border" style={{ maxHeight: '300px', objectFit: 'contain' }} />
                               </a>
                             ) : detailData.bukti_file.toLowerCase().endsWith('.pdf') ? (
                               <div className="d-flex align-items-center justify-content-center gap-3 p-3">
                                 <i className="bi bi-file-earmark-pdf-fill text-danger" style={{ fontSize: '3rem' }}></i>
                                 <div className="text-start">
-                                  <a href={`/${detailData.bukti_file}`} target="_blank" rel="noreferrer" className="fw-bold text-primary text-decoration-none d-block fs-5">Lihat Dokumen PDF</a>
+                                  <a href={gatewayAssetUrl(detailData.bukti_file)} target="_blank" rel="noreferrer" className="fw-bold text-primary text-decoration-none d-block fs-5">Lihat Dokumen PDF</a>
                                   <small className="text-muted">{detailData.bukti_file.split('/').pop()}</small>
                                 </div>
                               </div>
                             ) : (
-                              <a href={`/${detailData.bukti_file}`} target="_blank" rel="noreferrer" className="btn btn-outline-primary fw-semibold mt-2"><i className="bi bi-file-earmark-arrow-down me-2"></i> Unduh File Lampiran</a>
+                              <a href={gatewayAssetUrl(detailData.bukti_file)} target="_blank" rel="noreferrer" className="btn btn-outline-primary fw-semibold mt-2"><i className="bi bi-file-earmark-arrow-down me-2"></i> Unduh File Lampiran</a>
                             )}
                           </div>
                         )}
@@ -757,8 +855,8 @@ export default function DashboardDP3A() {
                 </div>
               </div>
 
-              {/* RIWAYAT TAHAPAN (Muncul jika Assessment / Intervensi sudah diisi) */}
-              {(detailData.hasil_assessment || detailData.metode_penanganan) && (
+              {/* RIWAYAT TAHAPAN — kasus arsip juga menampilkan seluruh log monitoring */}
+              {(detailData.hasil_assessment || detailData.metode_penanganan || detailData.status === 'selesai') && (
                 <div className="card border rounded-4 shadow-none mb-5">
                   <div className="card-header bg-white border-bottom p-4">
                     <h6 className="fw-bold m-0"><i className="bi bi-journal-check text-primary me-2"></i>Riwayat Pengisian Tahapan Kasus</h6>
@@ -786,7 +884,7 @@ export default function DashboardDP3A() {
                       )}
 
                       {detailData.metode_penanganan && (
-                        <div className="col-12 pb-2">
+                        <div className={`col-12 pb-4 ${detailData.status === 'selesai' ? 'border-bottom' : ''}`}>
                           <h6 className="fw-bold text-dark mb-3 small text-uppercase"><i className="bi bi-check-circle-fill text-success me-2"></i>Tahap Rencana Intervensi</h6>
                           <div className="row g-3">
                             <div className="col-md-4">
@@ -798,6 +896,40 @@ export default function DashboardDP3A() {
                               <div className="bg-white p-3 border rounded-3 text-dark small">{detailData.rencana_tindakan || '-'}</div>
                             </div>
                           </div>
+                        </div>
+                      )}
+
+                      {detailData.status === 'selesai' && (
+                        <div className="col-12 pb-2">
+                          <div className="monitoring-history-heading">
+                            <div>
+                              <h6><i className="bi bi-activity" aria-hidden="true"></i>Tahap Monitoring</h6>
+                              <p>Catatan perkembangan dan tindakan selama pemantauan kasus.</p>
+                            </div>
+                            <span>{detailData.activity_log?.length || 0} catatan</span>
+                          </div>
+
+                          {detailData.activity_log?.length > 0 ? (
+                            <div className="monitoring-history-list">
+                              {detailData.activity_log.map((log, idx) => (
+                                <div className="monitoring-history-item" key={log._id || idx}>
+                                  <span className="monitoring-history-marker" aria-hidden="true"><i className="bi bi-check2"></i></span>
+                                  <div className="monitoring-history-content">
+                                    <div className="monitoring-history-meta">
+                                      <time dateTime={log.tanggal}>{new Date(log.tanggal).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Makassar' })} WITA</time>
+                                      <span><i className="bi bi-person" aria-hidden="true"></i>{log.petugas_name || 'Petugas UPTD'}</span>
+                                    </div>
+                                    <p>{log.catatan}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="monitoring-history-empty">
+                              <i className="bi bi-journal-x" aria-hidden="true"></i>
+                              Tidak ada catatan monitoring yang tersimpan pada kasus ini.
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -816,6 +948,16 @@ export default function DashboardDP3A() {
 
                     {activeAction === 'registrasi' && (
                       <>
+                        <div className="mb-4">
+                          <label className="form-label fw-bold">Metode Pertemuan yang Dikonfirmasi</label>
+                          <select className="form-select" value={metodePertemuan} onChange={e => setMetodePertemuan(e.target.value)}>
+                            <option value="">-- Pilih Metode Pertemuan --</option>
+                            {METODE_PERTEMUAN_LIST.map(m => <option key={m} value={m}>{m}</option>)}
+                          </select>
+                          <div className="form-text">
+                            Pilihan awal pelapor: <strong>{detailData.preferensi_layanan || 'Tidak tersedia'}</strong>. Ubah hanya jika pelapor menyepakati metode lain.
+                          </div>
+                        </div>
                         <div className="mb-4">
                           <label className="form-label fw-bold">Pesan Tindak Lanjut untuk Pelapor</label>
                           <textarea className="form-control" rows={3} placeholder="Contoh: Laporan tervalidasi. Siapkan jadwal assessment..." value={pesanTindakLanjut} onChange={e => setPesanTindakLanjut(e.target.value)}></textarea>

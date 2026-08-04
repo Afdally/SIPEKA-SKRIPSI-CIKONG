@@ -13,7 +13,10 @@
 // pembatas laju sederhana di bawah.
 
 const MasterKekerasan = require('../models/MasterKekerasan');
-const ollama = require('../services/ollamaClient');
+// Penyedia modelnya ditentukan env (lihat llmClient.js) — bisa Ollama lokal
+// atau API awan. Dari sini keduanya sama saja.
+const llm = require('../services/llmClient');
+const { waktuDiZona } = require('../services/zonaWaktu');
 const {
   ekstrakDenganAturan,
   konversiTanggal,
@@ -110,7 +113,9 @@ exports.analisisKronologi = async (req, res) => {
     return res.status(429).json({ message: 'Terlalu banyak permintaan analisis. Coba lagi sebentar.' });
   }
 
-  const sekarang = new Date();
+  // Container berjalan dalam UTC, sedangkan pelapor SIPEKA berada di WITA.
+  // Tanpa konversi ini, "kemarin" salah satu hari pada pukul 00.00-07.59 WITA.
+  const sekarang = waktuDiZona(new Date());
 
   let masterKekerasan = [];
   try {
@@ -126,10 +131,16 @@ exports.analisisKronologi = async (req, res) => {
   let sumber = 'aturan';
   let model = null;
   let durasiMs = 0;
+  let penggunaanToken = null;
   let catatan = null;
 
   try {
-    const { mentah, durasiMs: durasi, model: namaModel } = await ollama.analisisKronologi({
+    const {
+      mentah,
+      durasiMs: durasi,
+      model: namaModel,
+      penggunaanToken: token,
+    } = await llm.analisisKronologi({
       kronologi,
       masterKekerasan,
       hubunganValid: HUBUNGAN_VALID,
@@ -152,6 +163,7 @@ exports.analisisKronologi = async (req, res) => {
     sumber = 'model';
     model = namaModel;
     durasiMs = durasi;
+    penggunaanToken = token || null;
   } catch (err) {
     // Bukan kegagalan permintaan: pelapor tetap dapat hasil dari aturan.
     // Isi cerita sengaja TIDAK ikut di-log — ini data pribadi bersifat spesifik.
@@ -163,6 +175,7 @@ exports.analisisKronologi = async (req, res) => {
     sumber,
     model,
     durasi_ms: durasiMs,
+    penggunaan_token: penggunaanToken,
     catatan,
     hasil,
     // Dipakai antarmuka untuk menandai field mana yang terisi otomatis,
