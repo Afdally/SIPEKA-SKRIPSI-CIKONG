@@ -135,11 +135,13 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:80"
     environment:
       API_GATEWAY_TARGET: http://api-gateway
     volumes:
       - ./frontend/ircm-frontend:/app
       - /app/node_modules
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - api-gateway
     networks:

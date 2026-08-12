@@ -1,19 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-
-// Panggilan ke /api dan /storage diteruskan dev server ini ke api-gateway, jadi
-// kode frontend cukup memakai path relatif dan tidak perlu tahu alamat backend.
-//
-// Ini yang membuat aplikasi bisa dibuka dari perangkat mana pun. Sebelumnya
-// alamat backend ditulis langsung sebagai "http://localhost:8080" — benar hanya
-// kalau browsernya berjalan di mesin yang sama dengan server. Dibuka dari HP
-// lewat Tailscale atau dari laptop lain di Wi-Fi, "localhost" di sana menunjuk
-// ke perangkat itu sendiri dan semua panggilan API mati.
-//
-// Targetnya bisa diganti lewat env karena letak backend berbeda tergantung cara
-// menjalankan (lihat dua opsi di README):
-//   - lewat Docker : gateway dikenal sebagai host "api-gateway" di jaringan compose
-//   - npm run dev  : gateway ada di localhost:8080 dari sudut pandang PC
+import fs from 'fs'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '')
   const apiGatewayTarget = env.API_GATEWAY_TARGET || 'http://localhost:8080'
@@ -22,9 +9,16 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       host: '0.0.0.0',
-      port: 80,
+      port: 443,
       watch: {
         usePolling: true,
+      },
+      allowedHosts: [
+        'sipeka.titikkami.site'
+      ],
+      https: {
+        key: fs.readFileSync('/etc/letsencrypt/live/sipeka.titikkami.site/privkey.pem'),
+        cert: fs.readFileSync('/etc/letsencrypt/live/sipeka.titikkami.site/fullchain.pem'),
       },
       proxy: {
         '/api': { target: apiGatewayTarget, changeOrigin: true },
