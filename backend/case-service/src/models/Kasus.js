@@ -14,6 +14,11 @@ const kasusSchema = new mongoose.Schema({
 
   // Tahap 1: Registrasi
   pesan_tindak_lanjut: { type: String, default: null },
+  metode_pertemuan: {
+    type: String,
+    enum: ['Datang ke UPTD', 'Petugas Mendatangi Korban'],
+    default: null,
+  },
   tanggal_registrasi:  { type: Date, default: Date.now },
 
   // Tahap 2: Assessment

@@ -26,10 +26,20 @@ function tebakUsia(teks) {
   return m ? Number(m[1]) : null
 }
 
+// Yang dicari jenis kelamin KORBAN. Sebutan kerabat (ibu/ayah/suami/istri)
+// sengaja TIDAK dipakai: dalam satu laporan ada sampai tiga orang, dan kata itu
+// lebih sering menunjuk pelaku. "adik saya dipukuli oleh ibu saya" bukan berarti
+// korbannya perempuan — jenis kelamin adik tidak disebutkan sama sekali.
+//
+// Pembedaan peran yang sesungguhnya dikerjakan backend (ekstraksiRule.js, yang
+// menautkan tiap sebutan ke perannya). Lapisan ini cuma jaring terakhir saat
+// backend tak terjangkau, jadi dibuat seadanya tapi tidak menyesatkan: lebih
+// baik kosong lalu diisi pelapor daripada terisi keliru lalu lolos tanpa
+// diperiksa dan menjadi data resmi.
 function tebakJenisKelamin(teks) {
   const t = teks.toLowerCase()
-  if (/\b(perempuan|wanita|istri|ibu|putri|gadis)\b/.test(t)) return 'Perempuan'
-  if (/\b(laki-laki|lelaki|pria|suami|putra)\b/.test(t)) return 'Laki-laki'
+  if (/\b(perempuan|wanita|putri|gadis)\b/.test(t)) return 'Perempuan'
+  if (/\b(laki-laki|lelaki|pria|putra)\b/.test(t)) return 'Laki-laki'
   return null
 }
 

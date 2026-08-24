@@ -8,6 +8,8 @@ const laporanController = require('../controllers/laporanController');
 const analisisController = require('../controllers/analisisController');
 const authMid = require('../middleware/auth');
 const roleMid = require('../middleware/role');
+const internalApiKey = require('../middleware/internalApiKey');
+const emailReminderController = require('../controllers/emailReminderController');
 
 // Setup multer for uploads
 const storageDir = path.join(__dirname, '../../storage/bukti');
@@ -33,6 +35,11 @@ router.get('/public-gis', laporanController.getPublicGis);
 // Bantu pelapor mengisi formulir dari cerita bebasnya (dipakai sebelum submit,
 // jadi harus publik seperti form pelaporannya sendiri)
 router.post('/analisis-kronologi', analisisController.analisisKronologi);
+
+// Hanya dipanggil langsung oleh Case Service, tidak melalui API Gateway.
+router.post('/internal/email-reminders/claim', internalApiKey, emailReminderController.claim);
+router.patch('/internal/email-reminders/complete', internalApiKey, emailReminderController.complete);
+router.patch('/internal/email-reminders/release', internalApiKey, emailReminderController.release);
 
 // Auth Middleware untuk rute di bawah ini
 router.use(authMid);

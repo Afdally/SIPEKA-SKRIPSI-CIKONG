@@ -45,15 +45,23 @@ services:
       JWT_SECRET: ircm_secret_key
       RABBITMQ_URL: amqp://rabbitmq:5672
       PORT: 8000
-      # Ollama diperlakukan sebagai infrastruktur eksternal, bukan microservice.
-      # host.docker.internal = Ollama jalan di mesin host (pakai GPU host langsung).
-      # Ganti ke IP LAN kalau Ollama ada di PC lain, mis. http://192.168.1.20:11434
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Makassar}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      EMAIL_REMINDER_AFTER_MINUTES: ${EMAIL_REMINDER_AFTER_MINUTES:-30}
+      EMAIL_REMINDER_LEASE_MINUTES: ${EMAIL_REMINDER_LEASE_MINUTES:-15}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gemini-2.5-flash}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
+      LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-20000}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      XAI_MODEL: ${XAI_MODEL:-grok-4.5}
+      XAI_BASE_URL: ${XAI_BASE_URL:-https://api.x.ai/v1}
+      XAI_TIMEOUT_MS: ${XAI_TIMEOUT_MS:-20000}
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
       OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-45000}
-      # Tahan model di memori supaya laporan berikutnya tidak kena biaya
-      # muat ulang model dari disk (5-20 detik di CPU).
-      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-24h}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-10m}
     extra_hosts:
       # Diperlukan di Linux/WSL supaya host.docker.internal bisa diresolusi
       - "host.docker.internal:host-gateway"
@@ -78,6 +86,16 @@ services:
       JWT_TTL: 3600
       RABBITMQ_URL: amqp://rabbitmq:5672
       PORT: 8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      REPORTING_SERVICE_URL: http://report-service:8000
+      PETUGAS_DASHBOARD_URL: ${PETUGAS_DASHBOARD_URL:-http://localhost}
+      EMAIL_REMINDER_POLL_MINUTES: ${EMAIL_REMINDER_POLL_MINUTES:-5}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     volumes:
       - ./backend/case-service:/usr/src/app
       - /usr/src/app/node_modules
@@ -92,7 +110,7 @@ services:
   # ============================================
 
   api-gateway:
-    image: nginx:alpine
+    image: nginx:1.31.3-alpine
     container_name: ircm-api-gateway
     restart: unless-stopped
     ports:
@@ -117,12 +135,13 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+    environment:
+      API_GATEWAY_TARGET: http://api-gateway
     volumes:
       - ./frontend/ircm-frontend:/app
       - /app/node_modules
     depends_on:
-      - report-service
-      - case-service
+      - api-gateway
     networks:
       - ircm-network
 

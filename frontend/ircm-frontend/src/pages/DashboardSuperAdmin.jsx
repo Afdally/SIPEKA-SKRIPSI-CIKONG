@@ -6,9 +6,12 @@ import authService from '../services/authService';
 import laporanService from '../services/laporanService';
 import kasusService from '../services/kasusService';
 import StatCard from '../components/dashboard/StatCard';
-import JenisKasusChart from '../components/dashboard/JenisKasusChart';
+import SebaranKelurahanChart from '../components/dashboard/SebaranKelurahanChart';
 import DemografiChart from '../components/dashboard/DemografiChart';
 import ActivityFeed from '../components/dashboard/ActivityFeed';
+import SidebarUserMenu from '../components/dashboard/SidebarUserMenu';
+import { beriTahuGagal, beriTahuKurang, konfirmasi } from '../utils/notifikasi';
+import { cocokDenganFilterKategori, kategoriKorban, labelKategoriKorban } from '../utils/kategoriKorban';
 import './Dashboard.css';
 
 // Status mentah di database -> label yang layak dibaca petugas/pimpinan.
@@ -75,12 +78,15 @@ export default function DashboardSuperAdmin() {
   // State form modal "Manajemen Petugas"
   const [showUserModal, setShowUserModal] = useState(false);
   const [userForm, setUserForm] = useState({ id: '', name: '', email: '', password: '', role: 'petugas_uptd' });
+  const [showUserPassword, setShowUserPassword] = useState(false);
+  const [savingUser, setSavingUser] = useState(false);
 
   // State form modal "Pusat Kendali Layanan"
   const [activeMasterTab, setActiveMasterTab] = useState('kekerasan');
   const [showMasterModal, setShowMasterModal] = useState(false);
   const [masterType, setMasterType] = useState(''); // 'kekerasan' | 'metode'
   const [masterForm, setMasterForm] = useState({ id: '', nama: '', deskripsi: '', is_active: true });
+  const [savingMaster, setSavingMaster] = useState(false);
 
   const getToken = () => localStorage.getItem('sipeka_token');
 
@@ -137,8 +143,8 @@ export default function DashboardSuperAdmin() {
     fetchAll(tok);
   }, [navigate, fetchAll]);
 
-  const handleLogout = () => {
-    if (!window.confirm('Keluar dari Super Admin?')) return;
+  const handleLogout = async () => {
+    if (!await konfirmasi('Keluar dari Super Admin?', { teksSetuju: 'Ya, keluar' })) return;
     localStorage.clear();
     navigate('/login');
   };
@@ -147,6 +153,7 @@ export default function DashboardSuperAdmin() {
 
   const saveUser = async (e) => {
     e.preventDefault();
+    setSavingUser(true);
     try {
       if (userForm.id) {
         const payload = { name: userForm.name, email: userForm.email, role: userForm.role };
@@ -158,21 +165,25 @@ export default function DashboardSuperAdmin() {
       setShowUserModal(false);
       fetchUsers(getToken());
     } catch (err) {
-      alert(err.response?.data?.message || 'Error saving user');
+      beriTahuGagal(err.response?.data?.message || 'Akun petugas gagal disimpan.');
+    } finally {
+      setSavingUser(false);
     }
   };
 
   const deleteUser = async (id) => {
-    if (!window.confirm('Yakin hapus akun petugas ini?')) return;
+    const setuju = await konfirmasi('Akun petugas ini akan dihapus permanen.', { judul: 'Hapus akun petugas?', teksSetuju: 'Ya, hapus', berbahaya: true });
+    if (!setuju) return;
     try {
       await authService.deleteUser(getToken(), id);
       fetchUsers(getToken());
-    } catch (err) { alert(err.response?.data?.message || 'Error'); }
+    } catch (err) { beriTahuGagal(err.response?.data?.message || 'Terjadi kesalahan pada sistem.'); }
   };
 
   const openUserModal = (u = null) => {
     if (u) setUserForm({ id: u._id, name: u.name, email: u.email, password: '', role: u.role });
     else setUserForm({ id: '', name: '', email: '', password: '', role: 'petugas_uptd' });
+    setShowUserPassword(false);
     setShowUserModal(true);
   };
 
@@ -180,6 +191,7 @@ export default function DashboardSuperAdmin() {
 
   const saveMaster = async (e) => {
     e.preventDefault();
+    setSavingMaster(true);
     try {
       const tok = getToken();
       const payload = masterType === 'kekerasan'
@@ -196,18 +208,21 @@ export default function DashboardSuperAdmin() {
       setShowMasterModal(false);
       fetchMaster(tok);
     } catch (err) {
-      alert(err.response?.data?.message || 'Error saving master data');
+      beriTahuGagal(err.response?.data?.message || 'Data master gagal disimpan.');
+    } finally {
+      setSavingMaster(false);
     }
   };
 
   const deleteMaster = async (type, id) => {
-    if (!window.confirm('Yakin hapus data master ini? Bisa berdampak pada history.')) return;
+    const setuju = await konfirmasi('Data ini dipakai laporan lama, menghapusnya bisa berdampak pada riwayat kasus.', { judul: 'Hapus data master?', teksSetuju: 'Ya, hapus', berbahaya: true });
+    if (!setuju) return;
     try {
       const tok = getToken();
       if (type === 'kekerasan') await laporanService.deleteMasterKekerasan(tok, id);
       else await kasusService.deleteMasterMetode(tok, id);
       fetchMaster(tok);
-    } catch (err) { alert(err.response?.data?.message || 'Error'); }
+    } catch (err) { beriTahuGagal(err.response?.data?.message || 'Terjadi kesalahan pada sistem.'); }
   };
 
   const openMasterModal = (type, item = null) => {
@@ -241,7 +256,7 @@ export default function DashboardSuperAdmin() {
         if (rDate > eDate) return false;
       }
       if (filterRegion && r.kelurahan_korban !== filterRegion) return false;
-      if (filterKategori && r.tipe_laporan !== filterKategori) return false;
+      if (!cocokDenganFilterKategori(r, filterKategori)) return false;
       if (filterStatus && r.status !== filterStatus) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
@@ -261,7 +276,7 @@ export default function DashboardSuperAdmin() {
   // difilter. Yang diekspor adalah data hasil filter yang sedang tampil.
   const handleExportExcel = async () => {
     const data = getFilteredReports();
-    if (data.length === 0) return alert('Tidak ada data untuk diekspor!');
+    if (data.length === 0) return beriTahuKurang('Tidak ada data untuk diekspor.');
 
     const headerRow = EXPORT_COLUMNS.map(col => ({
       value: col.header,
@@ -278,7 +293,7 @@ export default function DashboardSuperAdmin() {
         ...r,
         tanggal: isNaN(tgl.getTime()) ? null : tgl,
         usia_korban: Number.isFinite(Number(r.usia_korban)) ? Number(r.usia_korban) : null,
-        kategori: r.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan',
+        kategori: labelKategoriKorban(r).join(', '),
         status: labelStatus(r.status),
       };
 
@@ -299,7 +314,7 @@ export default function DashboardSuperAdmin() {
         stickyRowsCount: 1, // baris judul tetap terlihat saat digulir
       }).toFile(`Data_Pelaporan_${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (err) {
-      alert('Gagal membuat file Excel: ' + err.message);
+      beriTahuGagal(err.message, 'Gagal membuat file Excel');
     } finally {
       setExporting(false);
     }
@@ -308,6 +323,14 @@ export default function DashboardSuperAdmin() {
   if (!user) return null;
 
   // ==================== RENDER ====================
+
+  const activeMasterItems = (activeMasterTab === 'kekerasan' ? masterKekerasan : masterMetode).map(item => ({
+    ...item,
+    masterType: activeMasterTab,
+    masterName: activeMasterTab === 'kekerasan' ? item.nama_kategori : item.nama_metode,
+    masterDescription: item.deskripsi || 'Belum ada deskripsi untuk data ini.',
+  }));
+  const activeMasterCount = activeMasterItems.filter(item => item.is_active).length;
 
   return (
     <div className="dashboard-body" style={{ display: 'flex', minHeight: '100vh' }}>
@@ -345,9 +368,7 @@ export default function DashboardSuperAdmin() {
             </div>
           ))}
         </nav>
-        <div style={{ padding: '1rem 1.25rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <button className="btn btn-sm w-100 fw-bold text-white border-secondary rounded-pill" onClick={handleLogout}><i className="bi bi-box-arrow-right me-2"></i>Keluar</button>
-        </div>
+        <SidebarUserMenu user={user} roleLabel="Super Admin" onLogout={handleLogout} />
       </div>
 
       {/* MAIN */}
@@ -364,47 +385,6 @@ export default function DashboardSuperAdmin() {
             </button>
             <h5 className="fw-bold m-0 text-dark">{MENU_ITEMS.find(m => m.id === activeMenu)?.label}</h5>
           </div>
-          <div className="dropdown">
-            <button
-              className="user-avatar-btn dropdown-toggle"
-              type="button"
-              id="userDropdown"
-              data-bs-toggle="dropdown"
-              aria-expanded="false"
-            >
-              <div className="user-avatar-circle">
-                {user?.name?.charAt(0).toUpperCase()}
-              </div>
-              <span className="user-avatar-name">{user?.name}</span>
-              <i className="bi bi-chevron-down user-avatar-chevron"></i>
-            </button>
-            <div className="dropdown-menu dropdown-menu-end user-dropdown-menu" aria-labelledby="userDropdown">
-              {/* Header: info user */}
-              <div className="user-dropdown-header">
-                <div className="user-dropdown-avatar">
-                  {user?.name?.charAt(0).toUpperCase()}
-                </div>
-                <div className="user-dropdown-info">
-                  <div className="user-dropdown-name">{user?.name}</div>
-                  <div className="user-dropdown-email">{user?.email}</div>
-                  <span className="user-dropdown-role">Super Admin</span>
-                </div>
-              </div>
-              {/* Menu items */}
-              <div className="user-dropdown-body">
-                <button className="user-dropdown-item">
-                  <i className="bi bi-person"></i> Profil Saya
-                </button>
-                <button className="user-dropdown-item">
-                  <i className="bi bi-gear"></i> Pengaturan
-                </button>
-              </div>
-              {/* Sign out */}
-              <button className="user-dropdown-signout" onClick={handleLogout}>
-                <i className="bi bi-box-arrow-right"></i> Keluar
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* 1. TAB DASHBOARD (ringkasan eksekutif) */}
@@ -418,7 +398,7 @@ export default function DashboardSuperAdmin() {
             </div>
 
             <div className="row g-4 mb-4">
-              <div className="col-lg-8"><JenisKasusChart data={allReports} /></div>
+              <div className="col-lg-8"><SebaranKelurahanChart data={allReports} /></div>
               <div className="col-lg-4"><DemografiChart data={allReports} /></div>
             </div>
 
@@ -456,9 +436,12 @@ export default function DashboardSuperAdmin() {
 
         {/* 2. TAB MANAJEMEN PETUGAS */}
         {activeMenu === 'users' && (
-          <div className="master-card">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h4 className="fw-bold m-0" style={{ color: '#111827' }}>Manajemen Petugas</h4>
+          <div className="master-card service-control-card">
+            <div className="service-control-header">
+              <div>
+                <h4>Manajemen Petugas</h4>
+                <p>Kelola Petugas Yang Menangani Pelaporan dan Manajemen Kasus.</p>
+              </div>
               <button className="btn btn-dark rounded-pill px-4" onClick={() => openUserModal()}>
                 <i className="bi bi-person-plus me-2"></i> Tambah Akun
               </button>
@@ -477,12 +460,13 @@ export default function DashboardSuperAdmin() {
                     </div>
                   </div>
                   <div className="d-flex align-items-center gap-4">
-                    <span className={`badge-soft-${u.role === 'super_admin' ? 'secondary' : 'success'}`}>
-                      {u.role === 'super_admin' ? 'SUPER ADMIN' : 'PETUGAS UPTD'}
+                    <span className={`user-role-badge ${u.role === 'super_admin' ? 'is-admin' : 'is-officer'}`}>
+                      <i className={`bi ${u.role === 'super_admin' ? 'bi-shield-lock' : 'bi-person-badge'}`} aria-hidden="true"></i>
+                      {u.role === 'super_admin' ? 'Super Admin' : 'Petugas UPTD'}
                     </span>
                     <div className="actions d-flex gap-2">
-                      <button className="btn btn-sm btn-light text-primary rounded-circle" style={{ width: '32px', height: '32px' }} onClick={() => openUserModal(u)}><i className="bi bi-pencil"></i></button>
-                      <button className="btn btn-sm btn-light text-danger rounded-circle" style={{ width: '32px', height: '32px' }} onClick={() => deleteUser(u._id)} disabled={u._id === user.id}><i className="bi bi-trash"></i></button>
+                      <button type="button" className="user-action-button edit" onClick={() => openUserModal(u)} aria-label={`Edit akun ${u.name}`} title="Edit akun"><i className="bi bi-pencil" aria-hidden="true"></i></button>
+                      <button type="button" className="user-action-button delete" onClick={() => deleteUser(u._id)} disabled={u._id === user.id} aria-label={`Hapus akun ${u.name}`} title="Hapus akun"><i className="bi bi-trash" aria-hidden="true"></i></button>
                     </div>
                   </div>
                 </div>
@@ -494,55 +478,62 @@ export default function DashboardSuperAdmin() {
 
         {/* 3. TAB PUSAT KENDALI LAYANAN (master data) */}
         {activeMenu === 'master' && (
-          <div className="master-card">
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h4 className="fw-bold m-0" style={{ color: '#111827' }}>Pusat Kendali Layanan</h4>
-              <button className="btn btn-dark rounded-pill px-4" onClick={() => openMasterModal(activeMasterTab)}>
-                <i className="bi bi-plus-lg me-2"></i> Tambah {activeMasterTab === 'kekerasan' ? 'Kategori' : 'Metode'}
+          <div className="master-card service-control-card">
+            <div className="service-control-header">
+              <div>
+                <h4>Pusat Kendali Layanan</h4>
+                <p>Kelola pilihan yang digunakan dalam pelaporan dan penanganan kasus.</p>
+              </div>
+              <button type="button" className="btn service-add-button" onClick={() => openMasterModal(activeMasterTab)}>
+                <i className="bi bi-plus-lg" aria-hidden="true"></i> Tambah {activeMasterTab === 'kekerasan' ? 'Kategori' : 'Metode'}
               </button>
             </div>
 
-            <div className="master-tabs">
-              <button className={`master-tab ${activeMasterTab === 'kekerasan' ? 'active' : ''}`} onClick={() => setActiveMasterTab('kekerasan')}>Kategori Kekerasan</button>
-              <button className={`master-tab ${activeMasterTab === 'metode' ? 'active' : ''}`} onClick={() => setActiveMasterTab('metode')}>Metode Penanganan</button>
+            <div className="service-control-toolbar">
+              <div className="service-segmented-tabs" role="tablist" aria-label="Jenis master data">
+                <button type="button" role="tab" aria-selected={activeMasterTab === 'kekerasan'} className={activeMasterTab === 'kekerasan' ? 'active' : ''} onClick={() => setActiveMasterTab('kekerasan')}>
+                  <i className="bi bi-shield-exclamation" aria-hidden="true"></i>
+                  Kategori Kekerasan <span>{masterKekerasan.length}</span>
+                </button>
+                <button type="button" role="tab" aria-selected={activeMasterTab === 'metode'} className={activeMasterTab === 'metode' ? 'active' : ''} onClick={() => setActiveMasterTab('metode')}>
+                  <i className="bi bi-heart-pulse" aria-hidden="true"></i>
+                  Metode Penanganan <span>{masterMetode.length}</span>
+                </button>
+              </div>
+              <div className="service-control-stats" aria-label="Ringkasan data aktif">
+                <span><strong>{activeMasterItems.length}</strong> Total</span>
+                <span><strong>{activeMasterCount}</strong> Aktif</span>
+              </div>
             </div>
 
-            <div className="master-list">
-              {activeMasterTab === 'kekerasan' && masterKekerasan.map(k => (
-                <div className="master-list-item" key={k._id}>
-                  <div>
-                    <div className="fw-bold text-dark fs-6 mb-1">{k.nama_kategori}</div>
-                    <div className="text-muted small">{k.deskripsi || 'Tidak ada deskripsi'}</div>
+            <div className="master-list service-control-list" role="tabpanel">
+              {activeMasterItems.map(item => (
+                <div className="master-list-item service-control-item" key={item._id}>
+                  <div className={`service-item-icon ${item.masterType}`}>
+                    <i className={`bi ${item.masterType === 'kekerasan' ? 'bi-shield-exclamation' : 'bi-heart-pulse'}`} aria-hidden="true"></i>
                   </div>
-                  <div className="d-flex align-items-center gap-4">
-                    <span className={k.is_active ? 'badge-soft-success' : 'badge-soft-secondary'}>
-                      {k.is_active ? 'Aktif' : 'Nonaktif'}
+                  <div className="service-item-copy">
+                    <strong>{item.masterName}</strong>
+                    <p>{item.masterDescription}</p>
+                  </div>
+                  <div className="service-item-controls">
+                    <span className={`service-status-badge ${item.is_active ? 'active' : 'inactive'}`}>
+                      <span aria-hidden="true"></span>{item.is_active ? 'Aktif' : 'Nonaktif'}
                     </span>
                     <div className="actions d-flex gap-2">
-                      <button className="btn btn-sm btn-light text-primary rounded-circle" style={{ width: '32px', height: '32px' }} onClick={() => openMasterModal('kekerasan', k)}><i className="bi bi-pencil"></i></button>
-                      <button className="btn btn-sm btn-light text-danger rounded-circle" style={{ width: '32px', height: '32px' }} onClick={() => deleteMaster('kekerasan', k._id)}><i className="bi bi-trash"></i></button>
+                      <button type="button" className="user-action-button edit" onClick={() => openMasterModal(item.masterType, item)} aria-label={`Edit ${item.masterName}`} title="Edit"><i className="bi bi-pencil" aria-hidden="true"></i></button>
+                      <button type="button" className="user-action-button delete" onClick={() => deleteMaster(item.masterType, item._id)} aria-label={`Hapus ${item.masterName}`} title="Hapus"><i className="bi bi-trash" aria-hidden="true"></i></button>
                     </div>
                   </div>
                 </div>
               ))}
-
-              {activeMasterTab === 'metode' && masterMetode.map(m => (
-                <div className="master-list-item" key={m._id}>
-                  <div>
-                    <div className="fw-bold text-dark fs-6 mb-1">{m.nama_metode}</div>
-                    <div className="text-muted small">{m.deskripsi || 'Tidak ada deskripsi'}</div>
-                  </div>
-                  <div className="d-flex align-items-center gap-4">
-                    <span className={m.is_active ? 'badge-soft-success' : 'badge-soft-secondary'}>
-                      {m.is_active ? 'Aktif' : 'Nonaktif'}
-                    </span>
-                    <div className="actions d-flex gap-2">
-                      <button className="btn btn-sm btn-light text-primary rounded-circle" style={{ width: '32px', height: '32px' }} onClick={() => openMasterModal('metode', m)}><i className="bi bi-pencil"></i></button>
-                      <button className="btn btn-sm btn-light text-danger rounded-circle" style={{ width: '32px', height: '32px' }} onClick={() => deleteMaster('metode', m._id)}><i className="bi bi-trash"></i></button>
-                    </div>
-                  </div>
+              {activeMasterItems.length === 0 && (
+                <div className="service-empty-state">
+                  <span><i className="bi bi-inbox" aria-hidden="true"></i></span>
+                  <strong>Belum ada {activeMasterTab === 'kekerasan' ? 'kategori kekerasan' : 'metode penanganan'}</strong>
+                  <p>Tambahkan data agar dapat digunakan pada alur layanan SIPEKA.</p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         )}
@@ -648,9 +639,11 @@ export default function DashboardSuperAdmin() {
                       <td><span style={{ fontSize: '0.82rem' }}>{r.kelurahan_korban}</span></td>
                       <td><span style={{ fontSize: '0.82rem' }}>{r.jenis_kekerasan}</span></td>
                       <td>
-                        <span className={`status-pill ${r.tipe_laporan === 'anak' ? 'status-pill-warning' : 'status-pill-info'}`}>
-                          {r.tipe_laporan === 'anak' ? 'Anak' : 'Perempuan'}
-                        </span>
+                        {kategoriKorban(r).map(kategori => (
+                          <span key={kategori} className={`status-pill me-1 ${kategori === 'anak' ? 'status-pill-warning' : 'status-pill-info'}`}>
+                            {kategori === 'anak' ? 'Anak' : 'Perempuan'}
+                          </span>
+                        ))}
                       </td>
                       <td>
                         <span className={`status-pill ${
@@ -683,37 +676,70 @@ export default function DashboardSuperAdmin() {
 
       {/* Modal Users */}
       {showUserModal && (
-        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog">
-            <form className="modal-content" onSubmit={saveUser}>
-              <div className="modal-header">
-                <h5 className="modal-title">{userForm.id ? 'Edit Akun' : 'Tambah Akun Baru'}</h5>
-                <button type="button" className="btn-close" onClick={() => setShowUserModal(false)}></button>
+        <div className="modal fade show d-block admin-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
+          <div className="modal-dialog modal-dialog-centered account-modal-dialog">
+            <form className="modal-content account-modal" onSubmit={saveUser}>
+              <div className="account-modal-header">
+                <div className="account-modal-heading">
+                  <span className="account-modal-icon"><i className={`bi ${userForm.id ? 'bi-person-gear' : 'bi-person-plus'}`} aria-hidden="true"></i></span>
+                  <div>
+                    <h5 id="user-modal-title">{userForm.id ? 'Edit akun petugas' : 'Tambah akun petugas'}</h5>
+                    <p>{userForm.id ? 'Perbarui identitas dan hak akses akun.' : 'Buat akun baru untuk mengakses layanan SIPEKA.'}</p>
+                  </div>
+                </div>
+                <button type="button" className="account-modal-close" onClick={() => setShowUserModal(false)} aria-label="Tutup modal">
+                  <i className="bi bi-x-lg" aria-hidden="true"></i>
+                </button>
               </div>
-              <div className="modal-body">
-                <div className="mb-3">
-                  <label className="form-label small fw-bold">Nama Lengkap</label>
-                  <input type="text" className="form-control" value={userForm.name} onChange={e => setUserForm({ ...userForm, name: e.target.value })} required />
+              <div className="account-modal-body">
+                <div className="account-form-field">
+                  <label htmlFor="account-name">Nama lengkap</label>
+                  <div className="account-input-wrap">
+                    <i className="bi bi-person" aria-hidden="true"></i>
+                    <input id="account-name" type="text" className="form-control" autoComplete="name" placeholder="Contoh: Nur Aisyah" value={userForm.name} onChange={e => setUserForm({ ...userForm, name: e.target.value })} required />
+                  </div>
                 </div>
-                <div className="mb-3">
-                  <label className="form-label small fw-bold">Email</label>
-                  <input type="email" className="form-control" value={userForm.email} onChange={e => setUserForm({ ...userForm, email: e.target.value })} required />
+                <div className="account-form-field">
+                  <label htmlFor="account-email">Alamat email</label>
+                  <div className="account-input-wrap">
+                    <i className="bi bi-envelope" aria-hidden="true"></i>
+                    <input id="account-email" type="email" className="form-control" autoComplete="email" placeholder="nama@kendari.go.id" value={userForm.email} onChange={e => setUserForm({ ...userForm, email: e.target.value })} required />
+                  </div>
                 </div>
-                <div className="mb-3">
-                  <label className="form-label small fw-bold">Password {userForm.id && '(Kosongkan jika tidak diubah)'}</label>
-                  <input type="password" className="form-control" value={userForm.password} onChange={e => setUserForm({ ...userForm, password: e.target.value })} required={!userForm.id} />
+                <div className="account-form-field">
+                  <label htmlFor="account-password">Password</label>
+                  <div className="account-input-wrap has-action">
+                    <i className="bi bi-lock" aria-hidden="true"></i>
+                    <input id="account-password" type={showUserPassword ? 'text' : 'password'} className="form-control" autoComplete="new-password" placeholder={userForm.id ? 'Masukkan hanya jika ingin diubah' : 'Minimal 6 karakter'} value={userForm.password} onChange={e => setUserForm({ ...userForm, password: e.target.value })} required={!userForm.id} minLength={userForm.password ? 6 : undefined} />
+                    <button type="button" className="account-password-toggle" onClick={() => setShowUserPassword(nilai => !nilai)} aria-label={showUserPassword ? 'Sembunyikan password' : 'Tampilkan password'}>
+                      <i className={`bi ${showUserPassword ? 'bi-eye-slash' : 'bi-eye'}`} aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  {userForm.id && <small>Kosongkan jika password tidak ingin diubah.</small>}
                 </div>
-                <div className="mb-3">
-                  <label className="form-label small fw-bold">Role Hak Akses</label>
-                  <select className="form-select" value={userForm.role} onChange={e => setUserForm({ ...userForm, role: e.target.value })}>
-                    <option value="petugas_uptd">Petugas UPTD PPA</option>
-                    <option value="super_admin">Super Admin</option>
-                  </select>
-                </div>
+                <fieldset className="account-role-fieldset">
+                  <legend>Hak akses</legend>
+                  <div className="account-role-grid">
+                    <label className={`account-role-option ${userForm.role === 'petugas_uptd' ? 'selected' : ''}`}>
+                      <input type="radio" name="account-role" value="petugas_uptd" checked={userForm.role === 'petugas_uptd'} onChange={e => setUserForm({ ...userForm, role: e.target.value })} />
+                      <span className="account-role-icon"><i className="bi bi-person-badge" aria-hidden="true"></i></span>
+                      <span><strong>Petugas UPTD</strong><small>Menangani dan memperbarui proses kasus.</small></span>
+                      <i className="bi bi-check-circle-fill account-role-check" aria-hidden="true"></i>
+                    </label>
+                    <label className={`account-role-option ${userForm.role === 'super_admin' ? 'selected' : ''}`}>
+                      <input type="radio" name="account-role" value="super_admin" checked={userForm.role === 'super_admin'} onChange={e => setUserForm({ ...userForm, role: e.target.value })} />
+                      <span className="account-role-icon"><i className="bi bi-shield-lock" aria-hidden="true"></i></span>
+                      <span><strong>Super Admin</strong><small>Mengelola akun, layanan, dan seluruh data.</small></span>
+                      <i className="bi bi-check-circle-fill account-role-check" aria-hidden="true"></i>
+                    </label>
+                  </div>
+                </fieldset>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowUserModal(false)}>Batal</button>
-                <button type="submit" className="btn btn-primary">Simpan Akun</button>
+              <div className="account-modal-footer">
+                <button type="button" className="btn account-btn-secondary" onClick={() => setShowUserModal(false)} disabled={savingUser}>Batal</button>
+                <button type="submit" className="btn account-btn-primary" disabled={savingUser}>
+                  {savingUser ? <><span className="spinner-border spinner-border-sm" aria-hidden="true"></span> Menyimpan...</> : <><i className="bi bi-check2" aria-hidden="true"></i> {userForm.id ? 'Simpan perubahan' : 'Buat akun'}</>}
+                </button>
               </div>
             </form>
           </div>
@@ -722,30 +748,52 @@ export default function DashboardSuperAdmin() {
 
       {/* Modal Master */}
       {showMasterModal && (
-        <div className="modal fade show d-block" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog">
-            <form className="modal-content" onSubmit={saveMaster}>
-              <div className="modal-header">
-                <h5 className="modal-title">{masterForm.id ? 'Edit' : 'Tambah'} {masterType === 'kekerasan' ? 'Kategori Kekerasan' : 'Metode Penanganan'}</h5>
-                <button type="button" className="btn-close" onClick={() => setShowMasterModal(false)}></button>
+        <div className="modal fade show d-block admin-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="master-modal-title">
+          <div className="modal-dialog modal-dialog-centered account-modal-dialog">
+            <form className="modal-content account-modal service-master-modal" onSubmit={saveMaster}>
+              <div className="account-modal-header">
+                <div className="account-modal-heading">
+                  <span className="account-modal-icon"><i className={`bi ${masterType === 'kekerasan' ? 'bi-shield-plus' : 'bi-heart-pulse'}`} aria-hidden="true"></i></span>
+                  <div>
+                    <h5 id="master-modal-title">{masterForm.id ? 'Edit' : 'Tambah'} {masterType === 'kekerasan' ? 'kategori kekerasan' : 'metode penanganan'}</h5>
+                    <p>{masterType === 'kekerasan' ? 'Atur kategori yang tersedia pada formulir pelaporan.' : 'Atur metode yang dapat dipilih dalam penanganan kasus.'}</p>
+                  </div>
+                </div>
+                <button type="button" className="account-modal-close" onClick={() => setShowMasterModal(false)} disabled={savingMaster} aria-label="Tutup modal">
+                  <i className="bi bi-x-lg" aria-hidden="true"></i>
+                </button>
               </div>
-              <div className="modal-body">
-                <div className="mb-3">
-                  <label className="form-label small fw-bold">Nama {masterType === 'kekerasan' ? 'Kategori' : 'Metode'}</label>
-                  <input type="text" className="form-control" value={masterForm.nama} onChange={e => setMasterForm({ ...masterForm, nama: e.target.value })} required />
+              <div className="account-modal-body">
+                <div className="account-form-field">
+                  <label htmlFor="master-name">Nama {masterType === 'kekerasan' ? 'kategori' : 'metode'}</label>
+                  <div className="account-input-wrap">
+                    <i className={`bi ${masterType === 'kekerasan' ? 'bi-shield-exclamation' : 'bi-heart-pulse'}`} aria-hidden="true"></i>
+                    <input id="master-name" type="text" className="form-control" placeholder={masterType === 'kekerasan' ? 'Contoh: Kekerasan Fisik' : 'Contoh: Bantuan Hukum'} value={masterForm.nama} onChange={e => setMasterForm({ ...masterForm, nama: e.target.value })} required />
+                  </div>
                 </div>
-                <div className="mb-3">
-                  <label className="form-label small fw-bold">Deskripsi (Opsional)</label>
-                  <textarea className="form-control" rows="2" value={masterForm.deskripsi} onChange={e => setMasterForm({ ...masterForm, deskripsi: e.target.value })}></textarea>
+                <div className="account-form-field">
+                  <label htmlFor="master-description">Deskripsi <span className="service-optional-label">Opsional</span></label>
+                  <div className="account-input-wrap service-textarea-wrap">
+                    <i className="bi bi-text-left" aria-hidden="true"></i>
+                    <textarea id="master-description" className="form-control" rows="3" placeholder="Tuliskan penjelasan singkat agar mudah dipahami petugas." value={masterForm.deskripsi} onChange={e => setMasterForm({ ...masterForm, deskripsi: e.target.value })}></textarea>
+                  </div>
                 </div>
-                <div className="form-check form-switch mt-3">
-                  <input className="form-check-input" type="checkbox" checked={masterForm.is_active} onChange={e => setMasterForm({ ...masterForm, is_active: e.target.checked })} />
-                  <label className="form-check-label small fw-bold">Status Aktif (Ditampilkan di form)</label>
-                </div>
+                <label className={`service-status-card ${masterForm.is_active ? 'selected' : ''}`} htmlFor="master-active">
+                  <span className="service-status-card-icon"><i className={`bi ${masterForm.is_active ? 'bi-eye' : 'bi-eye-slash'}`} aria-hidden="true"></i></span>
+                  <span className="service-status-card-copy">
+                    <strong>{masterForm.is_active ? 'Aktif dan ditampilkan' : 'Nonaktif dan disembunyikan'}</strong>
+                    <small>{masterForm.is_active ? 'Data dapat dipilih pada proses layanan terkait.' : 'Data lama tetap tersimpan, tetapi tidak tersedia untuk pilihan baru.'}</small>
+                  </span>
+                  <span className="form-check form-switch service-status-switch">
+                    <input id="master-active" className="form-check-input" type="checkbox" role="switch" checked={masterForm.is_active} onChange={e => setMasterForm({ ...masterForm, is_active: e.target.checked })} />
+                  </span>
+                </label>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowMasterModal(false)}>Batal</button>
-                <button type="submit" className="btn btn-primary">Simpan Master Data</button>
+              <div className="account-modal-footer">
+                <button type="button" className="btn account-btn-secondary" onClick={() => setShowMasterModal(false)} disabled={savingMaster}>Batal</button>
+                <button type="submit" className="btn account-btn-primary" disabled={savingMaster}>
+                  {savingMaster ? <><span className="spinner-border spinner-border-sm" aria-hidden="true"></span> Menyimpan...</> : <><i className="bi bi-check2" aria-hidden="true"></i> {masterForm.id ? 'Simpan perubahan' : 'Tambah data'}</>}
+                </button>
               </div>
             </form>
           </div>

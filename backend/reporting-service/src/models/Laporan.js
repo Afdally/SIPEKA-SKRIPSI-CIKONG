@@ -36,6 +36,14 @@ const laporanSchema = new mongoose.Schema({
   // Status
   status:           { type: String, default: 'menunggu_registrasi' },
   catatan:          { type: String, default: null },
+  email_reminder_sent_at: { type: Date, default: null },
+  email_reminder_status: {
+    type: String,
+    enum: ['pending', 'claimed', 'sent'],
+    default: 'pending',
+  },
+  email_reminder_claimed_at: { type: Date, default: null },
+  email_reminder_claim_token: { type: String, default: null },
 }, { timestamps: true });
 
 laporanSchema.pre('save', function(next) {

@@ -13,7 +13,10 @@
 // pembatas laju sederhana di bawah.
 
 const MasterKekerasan = require('../models/MasterKekerasan');
-const ollama = require('../services/ollamaClient');
+// Penyedia modelnya ditentukan env (lihat llmClient.js) — bisa Ollama lokal
+// atau API awan. Dari sini keduanya sama saja.
+const llm = require('../services/llmClient');
+const { waktuDiZona } = require('../services/zonaWaktu');
 const {
   ekstrakDenganAturan,
   konversiTanggal,
@@ -22,6 +25,8 @@ const {
   bersihkanPilihan,
   bersihkanUsia,
   bersihkanTeksPendek,
+  adaPenandaGender,
+  korbanAdalahPelapor,
   HUBUNGAN_VALID,
   JENIS_KELAMIN_VALID,
 } = require('../services/ekstraksiRule');
@@ -63,7 +68,15 @@ function bersihkanHasilModel(mentah, { masterKekerasan, kronologi, sekarang }) {
     // pelaku. Field itu tetap diminta ke model sebagai tempat pembuangan supaya
     // nama pelaku tidak salah masuk ke nama_korban (lihat SKEMA di ollamaClient).
     usiaKorban:      bersihkanUsia(mentah.usia_korban),
-    jenisKelamin:    bersihkanPilihan(mentah.jenis_kelamin, JENIS_KELAMIN_VALID),
+    // Jawaban model hanya diterima kalau teksnya memang memuat kata yang
+    // menyifati jenis kelamin. Tanpa penjaga ini model mengisi field ini
+    // sekalipun cerita tidak menyebutnya sama sekali — dan jenis kelamin korban
+    // yang salah di laporan kekerasan bukan kesalahan yang murah.
+    // Kalau ditolak, hasil aturan yang dipakai (lihat gabungkan di bawah), yang
+    // masih bisa menyimpulkannya lewat pasangan saat pelapor = korban.
+    jenisKelamin:    adaPenandaGender(kronologi)
+                       ? bersihkanPilihan(mentah.jenis_kelamin, JENIS_KELAMIN_VALID)
+                       : null,
     hubunganKorban:  bersihkanPilihan(mentah.hubungan_pelapor, HUBUNGAN_VALID),
     jenisKekerasan:  bersihkanPilihan(mentah.jenis_kekerasan, masterKekerasan),
     lokasiKejadian:  bersihkanTeksPendek(mentah.lokasi_kejadian),
@@ -100,7 +113,9 @@ exports.analisisKronologi = async (req, res) => {
     return res.status(429).json({ message: 'Terlalu banyak permintaan analisis. Coba lagi sebentar.' });
   }
 
-  const sekarang = new Date();
+  // Container berjalan dalam UTC, sedangkan pelapor SIPEKA berada di WITA.
+  // Tanpa konversi ini, "kemarin" salah satu hari pada pukul 00.00-07.59 WITA.
+  const sekarang = waktuDiZona(new Date());
 
   let masterKekerasan = [];
   try {
@@ -116,10 +131,16 @@ exports.analisisKronologi = async (req, res) => {
   let sumber = 'aturan';
   let model = null;
   let durasiMs = 0;
+  let penggunaanToken = null;
   let catatan = null;
 
   try {
-    const { mentah, durasiMs: durasi, model: namaModel } = await ollama.analisisKronologi({
+    const {
+      mentah,
+      durasiMs: durasi,
+      model: namaModel,
+      penggunaanToken: token,
+    } = await llm.analisisKronologi({
       kronologi,
       masterKekerasan,
       hubunganValid: HUBUNGAN_VALID,
@@ -127,9 +148,22 @@ exports.analisisKronologi = async (req, res) => {
     });
 
     hasil = gabungkan(bersihkanHasilModel(mentah, { masterKekerasan, kronologi, sekarang }), hasilAturan);
+
+    // Satu-satunya tempat aturan MENGALAHKAN model, bukan sekadar menambal.
+    //
+    // Kalau cerita menyatakan kekerasannya mengarah ke pelapor sendiri ("...
+    // melakukan hal tidak senonoh ke saya"), itu penanda eksplisit dan tidak
+    // ambigu. Model 3B justru sering tersesat di kalimat begini: kerabat yang
+    // disebut sebagai pelaku dibacanya sebagai korban, lalu hubungannya
+    // dijawab "Orang Tua" padahal pelapornya sendiri yang jadi korban.
+    if (korbanAdalahPelapor(kronologi)) {
+      hasil.hubunganKorban = 'Diri Sendiri';
+    }
+
     sumber = 'model';
     model = namaModel;
     durasiMs = durasi;
+    penggunaanToken = token || null;
   } catch (err) {
     // Bukan kegagalan permintaan: pelapor tetap dapat hasil dari aturan.
     // Isi cerita sengaja TIDAK ikut di-log — ini data pribadi bersifat spesifik.
@@ -141,6 +175,7 @@ exports.analisisKronologi = async (req, res) => {
     sumber,
     model,
     durasi_ms: durasiMs,
+    penggunaan_token: penggunaanToken,
     catatan,
     hasil,
     // Dipakai antarmuka untuk menandai field mana yang terisi otomatis,

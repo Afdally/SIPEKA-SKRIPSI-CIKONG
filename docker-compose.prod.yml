@@ -1,0 +1,15 @@
+# Overlay KHUSUS VM produksi (sipeka.titikkami.site) — jangan dipakai di lokal.
+# Isinya cuma tambahan yang beda dari docker-compose.yml: port HTTPS + mount
+# sertifikat Let's Encrypt dari host VM. Dipisah dari file utama supaya
+# docker-compose.yml tetap aman dijalankan di mesin dev mana pun tanpa
+# butuh file sertifikat yang memang tidak ada di sana.
+#
+# Cara pakai di VM:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  frontend:
+    ports:
+      - "443:80"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
