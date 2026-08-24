@@ -468,7 +468,7 @@ export default function DashboardDP3A() {
               return (
                 <>
                   <div className="row g-3 mb-4">
-                    <StatCard icon="bi-file-earmark-text" iconBg="#eff6ff" iconColor="#2563eb" label="Total Laporan" value={allDataForCharts.length} />
+                    <StatCard icon="bi-file-earmark-text" iconBg="#fdf2f5" iconColor="#8c1c3f" label="Total Laporan" value={allDataForCharts.length} />
                     <StatCard icon="bi-exclamation-circle" iconBg="#fef2f2" iconColor="#dc2626" label="Pengaduan Baru" value={lapBaru.length} />
                     <StatCard icon="bi-briefcase" iconBg="#fffbeb" iconColor="#d97706" label="Sedang Diproses" value={kasAktif.length} />
                     <StatCard icon="bi-check-circle" iconBg="#f0fdf4" iconColor="#16a34a" label="Selesai / Terminasi" value={kasSels.length} />

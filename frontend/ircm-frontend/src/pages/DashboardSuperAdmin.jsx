@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import writeExcelFile from 'write-excel-file/browser';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import logo from '../assets/logo.png';
 import authService from '../services/authService';
 import laporanService from '../services/laporanService';
@@ -68,6 +70,7 @@ export default function DashboardSuperAdmin() {
   const [filterStatus, setFilterStatus] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // Data dari service lain
   const [stats, setStats] = useState({ summary: null, kinerja: [] });
@@ -281,7 +284,7 @@ export default function DashboardSuperAdmin() {
     const headerRow = EXPORT_COLUMNS.map(col => ({
       value: col.header,
       fontWeight: 'bold',
-      backgroundColor: '#1a56db',
+      backgroundColor: '#8c1c3f',
       textColor: '#ffffff',
       align: 'center',
       wrap: true,
@@ -317,6 +320,204 @@ export default function DashboardSuperAdmin() {
       beriTahuGagal(err.message, 'Gagal membuat file Excel');
     } finally {
       setExporting(false);
+    }
+  };
+
+  // 3 kelurahan dengan laporan terbanyak (untuk grafik batang di PDF), dipecah
+  // jumlah Anak vs Perempuan per kelurahan. Satu laporan bisa masuk keduanya
+  // sekaligus (anak perempuan) — sama seperti logika filter/grafik lain di
+  // dashboard ini (lihat kategoriKorban.js), jadi dua batang bukan pembagian
+  // yang selalu jumlahnya pas dengan total.
+  const getTop3Kelurahan = (data) => {
+    const jumlah = {};
+    data.forEach((r) => {
+      const kel = r.kelurahan_korban || 'Tidak diketahui';
+      if (!jumlah[kel]) jumlah[kel] = { anak: 0, perempuan: 0, total: 0 };
+      const kategori = kategoriKorban(r);
+      if (kategori.includes('anak')) jumlah[kel].anak += 1;
+      if (kategori.includes('perempuan')) jumlah[kel].perempuan += 1;
+      jumlah[kel].total += 1;
+    });
+    return Object.entries(jumlah)
+      .map(([kelurahan, v]) => ({ kelurahan, ...v }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 3);
+  };
+
+  // Ekspor PDF: halaman 1 kop surat + grafik batang (3 kelurahan dengan
+  // laporan terbanyak, dipecah warna Anak/Perempuan), halaman 2 tabel data
+  // lengkap (sama isinya dengan Excel) — permintaan dosen pembimbing supaya
+  // versi cetak punya ringkasan visual terpisah dari daftar data mentah.
+  const handleExportPdf = async () => {
+    const data = getFilteredReports();
+    if (data.length === 0) return beriTahuKurang('Tidak ada data untuk diekspor.');
+
+    setExportingPdf(true);
+    try {
+      const WARNA_PEREMPUAN = [140, 28, 63]; // --primary dashboard (maroon)
+      const WARNA_ANAK = [217, 119, 6]; // amber, sudah dipakai sebagai aksen sekunder di StatCard
+
+      // Logo cuma tersedia sebagai path/URL (import Vite), sementara jsPDF
+      // butuh data URL — diubah sekali di sini sebelum dipakai.
+      const logoDataUrl = await fetch(logo)
+        .then((res) => res.blob())
+        .then((blob) => new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        }))
+        .catch(() => null); // logo gagal dimuat bukan alasan buat gagalkan seluruh ekspor
+
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 14;
+      const logoSize = 18;
+
+      // Kop surat — dipanggil di setiap halaman (lihat didDrawPage di bawah
+      // untuk halaman tabel), bukan cuma sekali di halaman pertama.
+      const gambarKopSurat = () => {
+        if (logoDataUrl) {
+          doc.addImage(logoDataUrl, 'PNG', margin, 10, logoSize, logoSize);
+        }
+        const teksX = logoDataUrl ? margin + logoSize + 5 : margin;
+
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(30, 30, 30);
+        doc.text('DINAS PEMBERDAYAAN PEREMPUAN DAN PERLINDUNGAN ANAK', teksX, 16);
+        doc.text('KOTA KENDARI', teksX, 21.5);
+
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(100, 100, 100);
+        doc.text('Sistem Pelaporan Kekerasan Perempuan dan Anak (SIPEKA)', teksX, 26.5);
+
+        doc.setDrawColor(...WARNA_PEREMPUAN);
+        doc.setLineWidth(0.6);
+        doc.line(margin, 32, pageWidth - margin, 32);
+      };
+
+      // ===== HALAMAN 1: Kop surat + grafik =====
+      gambarKopSurat();
+
+      doc.setFontSize(13);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(...WARNA_PEREMPUAN);
+      doc.text('Laporan Data Pelaporan', margin, 40);
+
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(100, 100, 100);
+      doc.text(
+        `Dicetak ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}  •  ${data.length} data (mengikuti filter yang sedang aktif)`,
+        margin,
+        45.5,
+      );
+
+      // ===== Grafik batang: 3 kelurahan dengan laporan terbanyak =====
+      const top3 = getTop3Kelurahan(data);
+
+      if (top3.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(30, 30, 30);
+        doc.text('3 Kelurahan dengan Laporan Terbanyak', margin, 58);
+
+        // Legenda warna
+        const legendY = 65;
+        doc.setFillColor(...WARNA_PEREMPUAN);
+        doc.rect(margin, legendY - 3, 4, 4, 'F');
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(60, 60, 60);
+        doc.text('Perempuan', margin + 6, legendY);
+        doc.setFillColor(...WARNA_ANAK);
+        doc.rect(margin + 32, legendY - 3, 4, 4, 'F');
+        doc.text('Anak', margin + 38, legendY);
+
+        // Grafik memenuhi sisa halaman pertama karena tabel sudah pindah
+        // ke halaman terpisah.
+        const chartX = margin;
+        const chartY = legendY + 12;
+        const chartW = pageWidth - margin * 2;
+        const chartH = 120;
+        const maxVal = Math.max(...top3.flatMap((k) => [k.anak, k.perempuan]), 1);
+        const barW = 26;
+        const gapTengah = 6;
+
+        doc.setDrawColor(220, 220, 220);
+        doc.line(chartX, chartY + chartH, chartX + chartW, chartY + chartH);
+
+        const groupW = chartW / top3.length;
+        top3.forEach((k, i) => {
+          const groupCenterX = chartX + groupW * i + groupW / 2;
+          const perempuanX = groupCenterX - barW - gapTengah / 2;
+          const anakX = groupCenterX + gapTengah / 2;
+          const perempuanH = (k.perempuan / maxVal) * chartH;
+          const anakH = (k.anak / maxVal) * chartH;
+
+          doc.setFillColor(...WARNA_PEREMPUAN);
+          doc.rect(perempuanX, chartY + chartH - perempuanH, barW, Math.max(perempuanH, 0.3), 'F');
+          doc.setFillColor(...WARNA_ANAK);
+          doc.rect(anakX, chartY + chartH - anakH, barW, Math.max(anakH, 0.3), 'F');
+
+          doc.setFontSize(10);
+          doc.setTextColor(60, 60, 60);
+          doc.text(String(k.perempuan), perempuanX + barW / 2, chartY + chartH - perempuanH - 3, { align: 'center' });
+          doc.text(String(k.anak), anakX + barW / 2, chartY + chartH - anakH - 3, { align: 'center' });
+
+          doc.setFontSize(10.5);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(30, 30, 30);
+          const label = k.kelurahan.length > 30 ? `${k.kelurahan.slice(0, 28)}…` : k.kelurahan;
+          doc.text(label, groupCenterX, chartY + chartH + 8, { align: 'center' });
+          doc.setFont(undefined, 'normal');
+        });
+      }
+
+      // ===== HALAMAN 2+: Tabel data (sama dengan isi Excel) =====
+      // Kop surat digambar ulang di SETIAP halaman tabel lewat didDrawPage —
+      // termasuk kalau datanya panjang dan autoTable otomatis bikin halaman
+      // ke-3, ke-4, dst, bukan cuma halaman kedua.
+      doc.addPage();
+
+      autoTable(doc, {
+        startY: 46,
+        margin: { top: 46, left: margin, right: margin },
+        didDrawPage: () => {
+          gambarKopSurat();
+          doc.setFontSize(12);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(...WARNA_PEREMPUAN);
+          doc.text('Tabel Data Pelaporan', margin, 40);
+        },
+        head: [EXPORT_COLUMNS.map((c) => c.header)],
+        body: data.map((r) => {
+          const tgl = new Date(r.tanggal_kejadian);
+          return [
+            r.kode_laporan || '-',
+            isNaN(tgl.getTime()) ? '-' : tgl.toLocaleDateString('id-ID'),
+            r.nama_korban || '-',
+            r.usia_korban ?? '-',
+            r.jenis_kelamin || '-',
+            r.kelurahan_korban || '-',
+            r.jenis_kekerasan || '-',
+            labelKategoriKorban(r).join(', ') || '-',
+            labelStatus(r.status),
+            r.kronologi || '-',
+          ];
+        }),
+        styles: { fontSize: 7, cellPadding: 1.5, overflow: 'linebreak' },
+        headStyles: { fillColor: WARNA_PEREMPUAN, textColor: 255, fontStyle: 'bold' },
+        columnStyles: { 9: { cellWidth: 70 } },
+      });
+
+      doc.save(`Data_Pelaporan_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      beriTahuGagal(err.message, 'Gagal membuat file PDF');
+    } finally {
+      setExportingPdf(false);
     }
   };
 
@@ -391,7 +592,7 @@ export default function DashboardSuperAdmin() {
         {activeMenu === 'dashboard' && stats.summary && (
           <div className="bento-container">
             <div className="row g-3 mb-4">
-              <StatCard icon="bi-file-earmark-text" iconBg="#eff6ff" iconColor="#2563eb" label="Total Laporan" value={allReports.length} />
+              <StatCard icon="bi-file-earmark-text" iconBg="#fdf2f5" iconColor="#8c1c3f" label="Total Laporan" value={allReports.length} />
               <StatCard icon="bi-exclamation-circle" iconBg="#fef2f2" iconColor="#dc2626" label="Menunggu Verifikasi" value={allReports.filter(r => r.status === 'menunggu_registrasi').length} />
               <StatCard icon="bi-briefcase" iconBg="#fffbeb" iconColor="#d97706" label="Sedang Diproses" value={stats.summary.dalam_proses || 0} />
               <StatCard icon="bi-check-circle" iconBg="#f0fdf4" iconColor="#16a34a" label="Kasus Selesai" value={stats.summary.selesai} />
@@ -577,6 +778,15 @@ export default function DashboardSuperAdmin() {
                 >
                   <i className="bi bi-file-earmark-excel me-1"></i>
                   {exporting ? 'Menyiapkan...' : 'Export Excel'}
+                </button>
+
+                <button
+                  className="btn btn-danger btn-sm rounded-pill px-3 fw-bold"
+                  onClick={handleExportPdf}
+                  disabled={exportingPdf}
+                >
+                  <i className="bi bi-file-earmark-pdf me-1"></i>
+                  {exportingPdf ? 'Menyiapkan...' : 'Export PDF'}
                 </button>
               </div>
             </div>

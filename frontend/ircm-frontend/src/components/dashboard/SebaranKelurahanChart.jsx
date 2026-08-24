@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { cocokDenganFilterKategori } from '../../utils/kategoriKorban';
 
-const BAR_COLOR = '#6366f1'; // indigo-500, seirama --primary dashboard
+const BAR_COLOR = '#8c1c3f'; // maroon, seirama --primary dashboard
 const JUMLAH_TAMPIL = 8;
 
 // Nilainya mengikuti enum tipe_laporan di model Laporan (report-service).

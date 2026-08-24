@@ -402,21 +402,13 @@ export default function LandingPage() {
                   </div>
                 )}
 
-                <div className="row g-4 mb-5">
-                  {!isAnonim && (
-                    <div className="col-md-12">
+                {!isAnonim && (
+                  <div className="row g-4 mb-5">
+                    <div className="col-md-6">
                       <label className="form-label-premium">Nama Lengkap Pelapor <span className="text-danger">*</span></label>
                       <input name="namaPelapor" type="text" className={kelasInput('form-control-premium', 'namaPelapor')} required value={formData.namaPelapor} onChange={handleChange} placeholder="Masukkan nama pelapor" />
                     </div>
-                  )}
-                  
-                  <div className="col-md-6">
-                    <label className="form-label-premium">No. Telepon / WhatsApp <span className="text-danger">*</span></label>
-                    <input name="teleponPelapor" type="tel" className="form-control-premium" placeholder="Contoh: 08xxxxxxxxxx" required value={formData.teleponPelapor} onChange={handleChange} />
-                    <p className="text-muted mt-1 fst-italic m-0" style={{ fontSize: '0.7rem' }}>*) Digunakan khusus oleh petugas untuk tindak lanjut</p>
-                  </div>
 
-                  {!isAnonim && (
                     <div className="col-md-6">
                       <label className="form-label-premium">Hubungan dg Korban <span className="text-danger">*</span></label>
                       <select name="hubunganKorban" className={kelasInput('form-select-premium', 'hubunganKorban')} required value={formData.hubunganKorban} onChange={handleChange}>
@@ -424,8 +416,8 @@ export default function LandingPage() {
                         <option>Orang Tua</option><option>Anak</option><option>Saudara</option><option>Suami/Istri</option><option>Tetangga</option><option>Teman</option><option>Diri Sendiri</option>
                       </select>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* DATA KORBAN */}
                 <div className="form-section-title">
@@ -492,14 +484,6 @@ export default function LandingPage() {
                   <div className="col-md-12">
                     <label className="form-label-premium">Lokasi Spesifik Kejadian <span className="text-danger">*</span></label>
                     <input name="lokasiKejadian" type="text" className={kelasInput('form-control-premium', 'lokasiKejadian')} required value={formData.lokasiKejadian} onChange={handleChange} placeholder="Contoh: Rumah pelaku, Kos Paperu, Jalan raya, dsb." />
-                  </div>
-                  <div className="col-md-12">
-                    <div className="d-flex justify-content-between align-items-center mb-1">
-                      <label className="form-label-premium m-0">Kronologi Kejadian <span className="text-danger">*</span></label>
-                      <span className="fw-bold text-muted" style={{ fontSize: '0.7rem' }}>{formData.kronologi.length} / 1000 huruf</span>
-                    </div>
-                    <textarea name="kronologi" className="form-control-premium" rows={5} minLength={50} maxLength={1000} required value={formData.kronologi} onChange={handleChange} placeholder="Ceritakan urutan kejadian secara kronologis (minimal 50 huruf)..." />
-                    {formData.kronologi.length > 0 && formData.kronologi.length < 50 && <small className="text-danger mt-1 d-block">Minimal 50 huruf.</small>}
                   </div>
                   <div className="col-md-12">
                     <label className="form-label-premium">Upload Bukti Foto/Dokumen <span className="text-muted fw-normal text-lowercase">(Opsional)</span></label>
@@ -572,8 +556,12 @@ export default function LandingPage() {
           <p className="text-white fw-semibold mb-2" style={{ color: 'rgba(253, 242, 248, 0.8)' }}>
             Sistem Pelaporan Kekerasan Perempuan & Anak Kota Kendari (SIPEKA)
           </p>
-          <p className="m-0" style={{ fontSize: '0.7rem', color: 'rgba(253, 242, 248, 0.5)' }}>
+          <p className="m-0 mb-2" style={{ fontSize: '0.7rem', color: 'rgba(253, 242, 248, 0.5)' }}>
             © 2026 Dinas Pemberdayaan Perempuan & Perlindungan Anak Kota Kendari. Hak Cipta Dilindungi Undang-Undang.
+          </p>
+          {/* Wajib dicantumkan — syarat lisensi gratis ilustrasi hero dari Storyset */}
+          <p className="m-0" style={{ fontSize: '0.65rem', color: 'rgba(253, 242, 248, 0.35)' }}>
+            <a href="https://storyset.com/work" target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>Work illustrations by Storyset</a>
           </p>
         </div>
       </footer>

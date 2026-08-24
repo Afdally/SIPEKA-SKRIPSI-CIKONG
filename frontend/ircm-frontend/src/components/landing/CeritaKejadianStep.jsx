@@ -133,9 +133,6 @@ export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSel
               </label>
             ))}
           </div>
-          <p className="text-muted mt-2 fst-italic m-0" style={{ fontSize: '0.7rem' }}>
-            *) Jadwal dan lokasi pastinya akan dikonfirmasi ulang oleh petugas melalui telepon
-          </p>
         </div>
 
         {/* Pernyataan kebenaran — dasar pertanggungjawaban laporan */}
@@ -167,7 +164,7 @@ export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSel
         ) : (
           <div className="d-flex">
             <button type="submit" className="btn btn-primary fw-bold py-2 px-4 rounded-3 flex-fill">
-              <i className="bi bi-stars me-2"></i> Analisis Otomatis dengan AI
+              Submit Cerita & Lanjutkan
             </button>
           </div>
         )}

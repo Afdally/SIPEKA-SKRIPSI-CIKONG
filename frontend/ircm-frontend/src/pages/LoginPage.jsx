@@ -85,7 +85,7 @@ export default function LoginPage() {
       {/* PANEL KIRI — BRANDING (disembunyikan penuh di mobile) */}
       <div
         className="tw-relative tw-hidden tw-w-1/2 tw-flex-col tw-justify-between tw-overflow-hidden tw-p-12 tw-text-white lg:tw-flex"
-        style={{ background: 'linear-gradient(150deg, #8c1c3f 0%, #5c1023 55%, #2d0812 100%)' }}
+        style={{ background: 'linear-gradient(150deg, #BD3E6C 0%, #7C2647 55%, #5B1B34 100%)' }}
       >
         {/* Elemen dekoratif — radial-gradient samar */}
         <div
@@ -137,7 +137,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="tw-mb-8 tw-inline-flex tw-appearance-none tw-items-center tw-gap-2 tw-border-0 tw-bg-transparent tw-p-0 tw-text-sm tw-font-medium tw-text-gray-500 tw-outline-none tw-transition-colors hover:tw-text-[#8c1c3f]"
+            className="tw-mb-8 tw-inline-flex tw-appearance-none tw-items-center tw-gap-2 tw-border-0 tw-bg-transparent tw-p-0 tw-text-sm tw-font-medium tw-text-gray-500 tw-outline-none tw-transition-colors hover:tw-text-[#BD3E6C]"
           >
             <i className="fa-solid fa-arrow-left"></i> Kembali ke Beranda
           </button>
@@ -164,7 +164,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  className="tw-w-full tw-rounded-xl tw-border tw-border-gray-300 tw-bg-white tw-py-3 tw-pl-11 tw-pr-4 tw-text-sm tw-text-gray-900 tw-outline-none tw-transition focus:tw-border-[#8c1c3f] focus:tw-ring-4 focus:tw-ring-[#8c1c3f]/10"
+                  className="tw-w-full tw-rounded-xl tw-border tw-border-gray-300 tw-bg-white tw-py-3 tw-pl-11 tw-pr-4 tw-text-sm tw-text-gray-900 tw-outline-none tw-transition focus:tw-border-[#BD3E6C] focus:tw-ring-4 focus:tw-ring-[#BD3E6C]/10"
                 />
               </div>
             </div>
@@ -180,7 +180,7 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="tw-w-full tw-rounded-xl tw-border tw-border-gray-300 tw-bg-white tw-py-3 tw-pl-11 tw-pr-11 tw-text-sm tw-text-gray-900 tw-outline-none tw-transition focus:tw-border-[#8c1c3f] focus:tw-ring-4 focus:tw-ring-[#8c1c3f]/10"
+                  className="tw-w-full tw-rounded-xl tw-border tw-border-gray-300 tw-bg-white tw-py-3 tw-pl-11 tw-pr-11 tw-text-sm tw-text-gray-900 tw-outline-none tw-transition focus:tw-border-[#BD3E6C] focus:tw-ring-4 focus:tw-ring-[#BD3E6C]/10"
                 />
                 <button
                   type="button"
@@ -196,7 +196,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="tw-mt-2 tw-flex tw-w-full tw-appearance-none tw-items-center tw-justify-center tw-gap-2 tw-rounded-xl tw-border-0 tw-bg-[#8c1c3f] tw-py-3.5 tw-text-sm tw-font-bold tw-text-white tw-outline-none tw-transition hover:tw-bg-[#701731] disabled:tw-cursor-not-allowed disabled:tw-opacity-70"
+              className="tw-mt-2 tw-flex tw-w-full tw-appearance-none tw-items-center tw-justify-center tw-gap-2 tw-rounded-xl tw-border-0 tw-bg-[#BD3E6C] tw-py-3.5 tw-text-sm tw-font-bold tw-text-white tw-outline-none tw-transition hover:tw-bg-[#9C3159] disabled:tw-cursor-not-allowed disabled:tw-opacity-70"
             >
               {loading ? (
                 <>
@@ -211,7 +211,7 @@ export default function LoginPage() {
 
           <p className="tw-mt-8 tw-text-center tw-text-sm tw-text-gray-500">
             Ingin membuat laporan?{' '}
-            <Link to="/" className="tw-font-semibold tw-text-[#8c1c3f] hover:tw-underline">
+            <Link to="/" className="tw-font-semibold tw-text-[#BD3E6C] hover:tw-underline">
               Lapor tanpa akun di sini
             </Link>
           </p>
