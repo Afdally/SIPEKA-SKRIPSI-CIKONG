@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import authService from '../services/authService';
-import './Public.css';
 import logo from '../assets/logo.png';
 
 export default function LoginPage() {
@@ -74,90 +73,145 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="auth-body">
-      {/* Latar Belakang Kiri */}
-      <div className="auth-left">
-        <div className="auth-left-content">
-          <Link to="/" className="auth-logo">
-            <div className="auth-logo-icon">
-              <img src={logo} alt="Logo" style={{ width: '55px', height: 'auto' }} />
-            </div>
-            <div>
-              <div className="auth-logo-main">SIPEKA</div>
-              <div className="auth-logo-sub">DPPPA Kota Kendari</div>
-            </div>
-          </Link>
+    <div className="login-tw-scope tw-flex tw-min-h-screen tw-w-full tw-bg-white">
+      {/* Tailwind Preflight dimatikan (lihat index.html) supaya tidak menabrak
+          Bootstrap di halaman lain — tapi konsekuensinya class border-* cuma
+          nge-set lebar, bukan gaya border. Tanpa ini, border di <input> ikut
+          gaya bawaan browser ("inset", timbul sebelah), dan border di elemen
+          non-form (div, dsb) malah tidak muncul sama sekali. Baris ini
+          menyamakannya jadi solid, scoped ke halaman login saja. */}
+      <style>{`.login-tw-scope [class*="tw-border"] { border-style: solid; }`}</style>
 
-          <h2 className="auth-left-title">Portal Pelayanan<br />Terintegrasi IRCM<br />Kota Kendari</h2>
-          <p className="auth-left-desc">
-            Akses khusus bagi Petugas UPTD PPA untuk menerima laporan, melakukan assessment, dan menangani kasus kekerasan secara responsif.
+      {/* PANEL KIRI — BRANDING (disembunyikan penuh di mobile) */}
+      <div
+        className="tw-relative tw-hidden tw-w-1/2 tw-flex-col tw-justify-between tw-overflow-hidden tw-p-12 tw-text-white lg:tw-flex"
+        style={{ background: 'linear-gradient(150deg, #8c1c3f 0%, #5c1023 55%, #2d0812 100%)' }}
+      >
+        {/* Elemen dekoratif — radial-gradient samar */}
+        <div
+          className="tw-pointer-events-none tw-absolute tw-inset-0"
+          style={{ background: 'radial-gradient(circle at 15% 15%, rgba(255,255,255,0.10), transparent 45%), radial-gradient(circle at 85% 78%, rgba(255,255,255,0.07), transparent 42%)' }}
+        ></div>
+
+        {/* Elemen dekoratif — ombak SVG di bawah */}
+        <svg className="tw-pointer-events-none tw-absolute tw-bottom-0 tw-left-0 tw-w-full" viewBox="0 0 500 160" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0,90 C120,150 280,30 500,100 L500,160 L0,160 Z" fill="rgba(255,255,255,0.06)" />
+          <path d="M0,120 C150,70 350,160 500,70 L500,160 L0,160 Z" fill="rgba(255,255,255,0.045)" />
+        </svg>
+
+        {/* Logo + nama aplikasi + kepanjangan */}
+        <div className="tw-relative tw-z-10 tw-flex tw-items-center tw-gap-4">
+          <div
+            className="tw-flex tw-h-24 tw-w-24 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-2xl tw-border tw-border-white/30 tw-backdrop-blur-md"
+            style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.08) 60%, rgba(255,255,255,0.16) 100%)' }}
+          >
+            <img src={logo} alt="Logo SIPEKA" className="tw-h-14 tw-w-14 tw-object-contain" />
+          </div>
+          <div>
+            <div className="tw-text-2xl tw-font-bold tw-tracking-wide">SIPEKA KENDARI</div>
+            <p className="tw-mt-1 tw-text-xs tw-leading-snug tw-text-white/70">
+              Sistem Pelaporan dan Manajemen Kasus Kekerasan terhadap Perempuan dan Anak<br />
+              DPPPA Kota Kendari
+            </p>
+          </div>
+        </div>
+
+        {/* Sapaan */}
+        <div className="tw-relative tw-z-10">
+          <h1 className="tw-mb-3 tw-text-3xl tw-font-bold tw-leading-snug">
+            Selamat Datang,<br />Petugas UPTD PPA
+          </h1>
+          <p className="tw-max-w-sm tw-text-sm tw-leading-relaxed tw-text-white/75">
+            Masuk untuk menerima laporan, melakukan assessment, dan menangani kasus kekerasan perempuan dan anak secara responsif.
           </p>
+        </div>
+
+        <div className="tw-relative tw-z-10 tw-text-xs tw-text-white/50">
+          © {new Date().getFullYear()} DPPPA Kota Kendari
         </div>
       </div>
 
-      {/* Bagian Kanan Formulir */}
-      <div className="auth-right">
-        <div className="auth-form-container">
-          <Link to="/" className="auth-back-link">
-            <i className="bi bi-arrow-left"></i> Kembali ke Beranda
-          </Link>
+      {/* PANEL KANAN — FORM (satu-satunya panel yang tampil di mobile, di tengah) */}
+      <div className="tw-flex tw-w-full tw-flex-col tw-items-center tw-justify-center tw-bg-white tw-p-6 sm:tw-p-10 lg:tw-w-1/2">
+        <div className="tw-w-full tw-max-w-sm">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="tw-mb-8 tw-inline-flex tw-appearance-none tw-items-center tw-gap-2 tw-border-0 tw-bg-transparent tw-p-0 tw-text-sm tw-font-medium tw-text-gray-500 tw-outline-none tw-transition-colors hover:tw-text-[#8c1c3f]"
+          >
+            <i className="fa-solid fa-arrow-left"></i> Kembali ke Beranda
+          </button>
 
-          <h1 className="auth-form-title">Masuk Petugas / Admin</h1>
-          <p className="auth-form-subtitle">Silakan masukkan kredensial Anda untuk melanjutkan.</p>
+          <h2 className="tw-mb-1 tw-text-2xl tw-font-bold tw-text-gray-900">Masuk ke Akun Anda</h2>
+          <p className="tw-mb-8 tw-text-sm tw-text-gray-500">Silakan masukkan kredensial Anda untuk melanjutkan.</p>
 
           {errorMsg && (
-            <div className="auth-alert-error fade-in">
-              <i className="bi bi-exclamation-circle-fill" style={{ marginTop: '2px' }}></i>
+            <div className="tw-mb-6 tw-flex tw-items-start tw-gap-2 tw-rounded-xl tw-border tw-border-red-200 tw-bg-red-50 tw-p-3 tw-text-sm tw-text-red-600">
+              <i className="fa-solid fa-circle-exclamation tw-mt-0.5"></i>
               <span>{errorMsg}</span>
             </div>
           )}
 
-          <form onSubmit={handleLogin}>
-            <div className="form-group mb-3">
-              <label className="form-label-custom">Alamat Email</label>
-              <div className="input-wrapper position-relative d-flex align-items-center">
-                <span className="input-icon"><i className="bi bi-envelope"></i></span>
+          <form onSubmit={handleLogin} className="tw-space-y-5">
+            <div>
+              <label htmlFor="email" className="tw-mb-1.5 tw-block tw-text-sm tw-font-semibold tw-text-gray-700">Alamat Email</label>
+              <div className="tw-relative">
+                <i className="fa-solid fa-envelope tw-pointer-events-none tw-absolute tw-left-4 tw-top-1/2 -tw-translate-y-1/2 tw-text-gray-400"></i>
                 <input
+                  id="email"
                   type="email"
-                  className="form-input"
                   placeholder="contoh@email.com"
                   required
                   value={email}
                   onChange={e => setEmail(e.target.value)}
+                  className="tw-w-full tw-rounded-xl tw-border tw-border-gray-300 tw-bg-white tw-py-3 tw-pl-11 tw-pr-4 tw-text-sm tw-text-gray-900 tw-outline-none tw-transition focus:tw-border-[#8c1c3f] focus:tw-ring-4 focus:tw-ring-[#8c1c3f]/10"
                 />
               </div>
             </div>
 
-            <div className="form-group mb-4">
-              <label className="form-label-custom">Password</label>
-              <div className="input-wrapper position-relative d-flex align-items-center">
-                <span className="input-icon"><i className="bi bi-lock"></i></span>
+            <div>
+              <label htmlFor="password" className="tw-mb-1.5 tw-block tw-text-sm tw-font-semibold tw-text-gray-700">Password</label>
+              <div className="tw-relative">
+                <i className="fa-solid fa-lock tw-pointer-events-none tw-absolute tw-left-4 tw-top-1/2 -tw-translate-y-1/2 tw-text-gray-400"></i>
                 <input
+                  id="password"
                   type={showPass ? 'text' : 'password'}
-                  className="form-input"
                   placeholder="Masukkan password"
                   required
                   value={password}
                   onChange={e => setPassword(e.target.value)}
+                  className="tw-w-full tw-rounded-xl tw-border tw-border-gray-300 tw-bg-white tw-py-3 tw-pl-11 tw-pr-11 tw-text-sm tw-text-gray-900 tw-outline-none tw-transition focus:tw-border-[#8c1c3f] focus:tw-ring-4 focus:tw-ring-[#8c1c3f]/10"
                 />
-                <button type="button" className="input-toggle" onClick={() => setShowPass(!showPass)}>
-                  <i className={showPass ? 'bi bi-eye-slash' : 'bi bi-eye'}></i>
+                <button
+                  type="button"
+                  onClick={() => setShowPass(!showPass)}
+                  className="tw-absolute tw-right-4 tw-top-1/2 tw-flex tw-appearance-none -tw-translate-y-1/2 tw-items-center tw-border-0 tw-bg-transparent tw-p-0 tw-text-gray-400 tw-outline-none tw-transition-colors hover:tw-text-gray-600"
+                  aria-label={showPass ? 'Sembunyikan password' : 'Tampilkan password'}
+                >
+                  <i className={showPass ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'}></i>
                 </button>
               </div>
             </div>
 
-            <button type="submit" className="btn-submit" disabled={loading}>
+            <button
+              type="submit"
+              disabled={loading}
+              className="tw-mt-2 tw-flex tw-w-full tw-appearance-none tw-items-center tw-justify-center tw-gap-2 tw-rounded-xl tw-border-0 tw-bg-[#8c1c3f] tw-py-3.5 tw-text-sm tw-font-bold tw-text-white tw-outline-none tw-transition hover:tw-bg-[#701731] disabled:tw-cursor-not-allowed disabled:tw-opacity-70"
+            >
               {loading ? (
-                <><span className="spinner-sm"></span> Memproses...</>
+                <>
+                  <span className="tw-h-4 tw-w-4 tw-animate-spin tw-rounded-full tw-border-2 tw-border-white/30 tw-border-t-white"></span>
+                  Memproses...
+                </>
               ) : (
                 'Masuk ke Dashboard'
               )}
             </button>
           </form>
 
-          <p className="text-center mt-4" style={{ fontSize: '14px', color: '#6b7280' }}>
+          <p className="tw-mt-8 tw-text-center tw-text-sm tw-text-gray-500">
             Ingin membuat laporan?{' '}
-            <Link to="/" style={{ color: '#1a56db', fontWeight: '600', textDecoration: 'none' }}>
+            <Link to="/" className="tw-font-semibold tw-text-[#8c1c3f] hover:tw-underline">
               Lapor tanpa akun di sini
             </Link>
           </p>

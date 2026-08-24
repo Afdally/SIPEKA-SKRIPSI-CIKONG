@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import laporanService from '../services/laporanService';
 import CeritaKejadianStep from '../components/landing/CeritaKejadianStep';
+import HeroIllustration from '../components/landing/HeroIllustration';
 import './Public.css';
 import logo from '../assets/logo.png';
 
@@ -186,54 +187,54 @@ export default function LandingPage() {
     alert('Kode Laporan disalin!');
   };
 
+  // Dipakai tombol CTA header & hero: pindah ke tab yang relevan lalu
+  // scroll halus ke panel form (murni navigasi tampilan, bukan logic baru).
+  const scrollToPanel = (tab) => {
+    setActiveTab(tab);
+    document.getElementById('panel-laporan')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="landing-wrapper">
-      {/* HEADER PREMIUM */}
+      {/* HEADER */}
       <header className="header-premium">
-        <div className="container h-100 d-flex align-items-center justify-content-between" style={{ minHeight: '80px' }}>
+        <div className="container h-100 d-flex align-items-center justify-content-between" style={{ minHeight: '84px' }}>
           <div className="d-flex align-items-center gap-3">
-            <img src={logo} alt="Logo" style={{ width: '55px', height: 'auto' }} />
+            <img src={logo} alt="Logo" className="header-logo" />
             <div>
-              <h1 className="text-white fw-bolder m-0" style={{ fontSize: '1.125rem', letterSpacing: '0.05em' }}>SIPEKA KENDARI</h1>
-              <p className="m-0 fw-semibold" style={{ color: 'rgba(124, 200, 252, 0.8)', fontSize: '0.75rem' }}>Pelaporan Kekerasan Perempuan & Anak</p>
+              <div className="header-brand-name">SIPEKA KENDARI</div>
+              <div className="header-brand-tagline">Pelaporan Kekerasan Perempuan & Anak</div>
             </div>
           </div>
-          <button onClick={() => navigate('/login')} className="btn btn-outline-light btn-sm fw-bold px-3 py-2" style={{ borderRadius: '0.75rem', backgroundColor: 'rgba(11, 67, 112, 0.6)' }}>
-            <i className="bi bi-box-arrow-in-right me-2"></i>Login Admin
-          </button>
+          <div className="d-flex align-items-center gap-3">
+            <button onClick={() => navigate('/login')} className="header-cta-btn d-none d-sm-inline-flex">
+              <i className="bi bi-person-circle"></i> Login Admin
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* HERO SECTION PREMIUM */}
-      <section className="hero-landing">
-        <div className="hero-glow-1"></div>
-        <div className="hero-glow-2"></div>
-        <div className="container position-relative z-10">
+      {/* HERO */}
+      <section className="hero-landing" id="beranda">
+        <div className="container position-relative">
           <div className="row align-items-center">
-            <div className="col-lg-7 text-white mb-5 mb-lg-0">
-              <div className="d-inline-flex align-items-center gap-2 px-3 py-1 mb-4 border rounded-pill" style={{ backgroundColor: 'rgba(14, 148, 235, 0.2)', borderColor: 'rgba(56, 174, 249, 0.3)', color: '#7cc8fc', fontSize: '0.75rem', fontWeight: '600' }}>
-                <span className="spinner-grow spinner-grow-sm text-info" style={{ width: '0.5rem', height: '0.5rem' }}></span>
-                DPPPA KOTA KENDARI
-              </div>
-              <h2 className="display-4 fw-bolder text-white mb-4" style={{ lineHeight: '1.2', fontWeight: 900 }}>
-                Laporkan Kekerasan,<br/>
-                <span style={{ color: '#38aef9' }}>Lindungi Sesama.</span>
-              </h2>
-              <p className="lead mb-4" style={{ color: 'rgba(186, 224, 253, 0.9)', fontSize: '1.125rem' }}>
-                Jangan takut untuk bersuara. Kami menyediakan layanan perlindungan khusus yang dijaga <span className="text-white fw-bold text-decoration-underline" style={{ textDecorationColor: '#38aef9', textDecorationThickness: '2px' }}>100% kerahasiaannya</span> oleh DPPPA Kota Kendari.
+            <div className="col-lg-6 mb-5 mb-lg-0">
+              <h1 className="hero-title">Laporkan Kekerasan Perempuan dan Anak</h1>
+              <p className="hero-desc">
+                Laporan Anda dijamin rahasia dan ditangani langsung oleh petugas UPTD PPA Kota Kendari.
               </p>
+              <div className="hero-cta-group">
+                <button className="btn-hero-primary" onClick={() => scrollToPanel('lapor')}>
+                  <i className="bi bi-pencil-fill"></i> Buat Laporan
+                </button>
+                <button className="btn-hero-secondary" onClick={() => scrollToPanel('status')}>
+                  <i className="bi bi-compass"></i> Cek Status
+                </button>
+              </div>
             </div>
-            <div className="col-lg-5">
-              <div className="glass-panel">
-                <div className="d-flex align-items-start gap-3">
-                  <div className="flex-shrink-0 d-flex align-items-center justify-content-center" style={{ width: '3.5rem', height: '3.5rem', backgroundColor: 'rgba(245, 158, 11, 0.2)', border: '1px solid rgba(245, 158, 11, 0.4)', borderRadius: '1rem', color: '#facc15' }}>
-                    <i className="bi bi-shield-fill-check fs-2"></i>
-                  </div>
-                  <div>
-                    <h3 className="text-white fw-bold h5 mb-2">100% Rahasia & Aman</h3>
-                    <p className="mb-0" style={{ color: 'rgba(186, 224, 253, 0.8)', fontSize: '0.875rem' }}>Bebas laporkan secara anonim. Identitas pelapor dijamin aman, terlindungi, dan tidak dipublikasikan serta dilindungi oleh hukum.</p>
-                  </div>
-                </div>
+            <div className="col-lg-6">
+              <div className="hero-illustration-wrap">
+                <HeroIllustration />
               </div>
             </div>
           </div>
@@ -241,8 +242,8 @@ export default function LandingPage() {
       </section>
 
       {/* MAIN FORM */}
-      <div className="container pb-5" style={{ marginTop: '-80px', position: 'relative', zIndex: 20 }}>
-        <div className="form-card p-0">
+      <div className="container pb-5" style={{ marginTop: '-40px', position: 'relative', zIndex: 20 }}>
+        <div className="form-card p-0" id="panel-laporan">
           <div className="tab-header">
             <button onClick={() => setActiveTab('lapor')} className={`tab-btn ${activeTab === 'lapor' ? 'active' : 'inactive'}`}>
               <i className="bi bi-plus-circle-fill"></i> Buat Laporan Baru
@@ -352,17 +353,17 @@ export default function LandingPage() {
             {activeTab === 'lapor' && !submitResult && !showCeritaStep && (
               <form onSubmit={handleSubmitLaporan}>
                 {['model', 'aturan', 'lokal', 'success'].includes(autoFillNotice) && (
-                  <div className="alert-callout mb-4" style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }}>
-                    <i className="bi bi-stars fs-4" style={{ color: '#0e94eb' }}></i>
+                  <div className="alert-callout mb-4" style={{ backgroundColor: 'var(--pink-50)', borderColor: 'var(--pink-200)' }}>
+                    <i className="bi bi-stars fs-4" style={{ color: 'var(--pink-600)' }}></i>
                     <div>
-                      <h5 className="fw-bold mb-1" style={{ fontSize: '0.875rem', color: '#0e94eb' }}>
+                      <h5 className="fw-bold mb-1" style={{ fontSize: '0.875rem', color: 'var(--pink-700)' }}>
                         {fieldTerisiOtomatis.length > 0
                           ? `${fieldTerisiOtomatis.length} Data Terisi Otomatis`
                           : 'Tidak Ada Data yang Bisa Diisi Otomatis'}
                       </h5>
-                      <p className="mb-0" style={{ fontSize: '0.875rem', color: '#0e94eb', opacity: 0.85 }}>
+                      <p className="mb-0" style={{ fontSize: '0.875rem', color: 'var(--pink-700)', opacity: 0.85 }}>
                         {fieldTerisiOtomatis.length > 0
-                          ? 'Kolom yang bertanda biru diisi dari cerita Anda — ini hanya usulan sistem. Mohon periksa dan koreksi kalau ada yang kurang tepat sebelum mengirim.'
+                          ? 'Kolom yang bertanda pink diisi dari cerita Anda — ini hanya usulan sistem. Mohon periksa dan koreksi kalau ada yang kurang tepat sebelum mengirim.'
                           : 'Cerita Anda sudah tersimpan, tapi sistem belum menemukan keterangan yang cukup jelas. Silakan lengkapi formulir di bawah.'}
                         {autoFillNotice !== 'model' && ' (Analisis lengkap sedang tidak tersedia, dipakai pembacaan sederhana.)'}
                       </p>
@@ -544,7 +545,7 @@ export default function LandingPage() {
                     <i className="bi bi-shield-check text-success fs-5"></i>
                     Keamanan data terjamin 100%
                   </div>
-                  <button type="submit" className="btn btn-primary btn-lg fw-bold px-5 py-3 shadow w-100" style={{ borderRadius: '0.75rem', backgroundColor: '#0276cb', maxWidth: '300px' }} disabled={loadingSubmit}>
+                  <button type="submit" className="btn btn-primary btn-lg fw-bold px-5 py-3 shadow w-100" style={{ borderRadius: '0.75rem', maxWidth: '300px' }} disabled={loadingSubmit}>
                     {loadingSubmit ? 'Mengirim Data...' : <><i className="bi bi-send-fill me-2"></i> Kirim Laporan Pengaduan</>}
                   </button>
                 </div>
@@ -568,7 +569,7 @@ export default function LandingPage() {
                   <button className="btn btn-outline-secondary fw-bold px-4 py-3" style={{ borderRadius: '0.75rem' }} onClick={copyKode}>
                     <i className="bi bi-copy me-2"></i>Salin Kode
                   </button>
-                  <button className="btn btn-primary fw-bold px-4 py-3 shadow" style={{ borderRadius: '0.75rem', backgroundColor: '#0276cb' }} onClick={() => { setSubmitResult(null); setActiveTab('status'); }}>
+                  <button className="btn btn-primary fw-bold px-4 py-3 shadow" style={{ borderRadius: '0.75rem' }} onClick={() => { setSubmitResult(null); setActiveTab('status'); }}>
                     Lacak Status Sekarang <i className="bi bi-arrow-right ms-2"></i>
                   </button>
                 </div>
@@ -580,12 +581,12 @@ export default function LandingPage() {
       </div>
 
       {/* FOOTER */}
-      <footer className="text-center py-5 mt-5" style={{ backgroundColor: '#072b4a', borderTop: '1px solid rgba(11, 67, 112, 0.5)' }}>
+      <footer className="text-center py-5 mt-5" style={{ backgroundColor: 'var(--pink-900)', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
         <div className="container">
-          <p className="text-white fw-semibold mb-2" style={{ color: 'rgba(124, 200, 252, 0.8)' }}>
+          <p className="text-white fw-semibold mb-2" style={{ color: 'rgba(253, 242, 248, 0.8)' }}>
             Sistem Pelaporan Kekerasan Perempuan & Anak Kota Kendari (SIPEKA)
           </p>
-          <p className="m-0" style={{ fontSize: '0.7rem', color: 'rgba(186, 224, 253, 0.5)' }}>
+          <p className="m-0" style={{ fontSize: '0.7rem', color: 'rgba(253, 242, 248, 0.5)' }}>
             © 2026 Dinas Pemberdayaan Perempuan & Perlindungan Anak Kota Kendari. Hak Cipta Dilindungi Undang-Undang.
           </p>
         </div>

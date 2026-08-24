@@ -85,9 +85,7 @@ export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSel
         <div className="cerita-step-icon"><i className="bi bi-chat-heart-fill"></i></div>
         <h4 className="fw-bold mb-1">Ceritakan Apa yang Terjadi</h4>
         <p className="small text-muted mb-0 mx-auto" style={{ maxWidth: '32rem' }}>
-          Tulis kejadiannya dengan bahasa Anda sendiri, sedetail yang Anda nyaman ceritakan. Sistem akan
-          membantu melengkapi formulir secara otomatis — Anda tetap bisa memeriksa dan mengoreksi
-          semuanya sebelum laporan benar-benar dikirim.
+          Tulis dengan bahasa Anda sendiri. Sistem akan bantu melengkapi formulir — Anda tetap bisa memeriksanya sebelum dikirim.
         </p>
       </div>
 
@@ -178,10 +176,7 @@ export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSel
         ) : (
           <div className="d-flex flex-column flex-sm-row gap-2">
             <button type="submit" className="btn btn-primary fw-bold py-2 px-4 rounded-3 flex-fill">
-              <i className="bi bi-stars me-2"></i> Analisis Otomatis dengan AI
-            </button>
-            <button type="button" className="btn btn-outline-secondary fw-bold py-2 px-4 rounded-3" onClick={handleSkip}>
-              Lewati, isi manual
+               Analisis Otomatis dengan AI
             </button>
           </div>
         )}

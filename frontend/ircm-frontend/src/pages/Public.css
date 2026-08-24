@@ -1,94 +1,240 @@
 /* ============================================================
    HALAMAN PUBLIK — SIPEKA
-   Dipakai bersama oleh LandingPage (pelaporan & cek status) dan
-   LoginPage (masuk petugas/admin). Digabung jadi satu file karena
-   keduanya berbagi bahasa visual yang sama: panel gradient gelap,
-   lingkaran dekoratif, dan gaya form yang seragam.
+   Dipakai oleh LandingPage (pelaporan & cek status). LoginPage
+   punya bahasa visual sendiri (Tailwind CDN, lihat index.html)
+   jadi tidak lagi berbagi style dengan file ini.
 
-   Design token (--brand-*, --slate-*, --grad-brand, dst) didefinisikan
+   Design token (--pink-*, --ink-*, --sand-*, dst) didefinisikan
    di App.css, bukan di sini.
 
    Daftar isi:
-     1. Panel gradient & dekorasi (dipakai landing + login)
-     2. Landing — header & hero
+     1. Header & nav
+     2. Hero — badge, headline, CTA, ilustrasi
      3. Landing — kartu form & tab
      4. Landing — kontrol form (input, toggle, section)
      5. Landing — langkah "Ceritakan Kejadian"
      6. Landing — pelacak status laporan
-     7. Login — tata letak dua kolom
-     8. Login — form & tombol
    ============================================================ */
 
 body {
-  background-color: var(--slate-050);
+  background-color: var(--sand-50);
+}
+
+/* Bootstrap (CDN) defaultnya biru untuk .btn-primary/.text-primary/
+   .bg-primary/.border-primary. Disamakan ke brand pink di sini, terpusat,
+   supaya elemen yang masih pakai kelas itu (tab "Cek Status", hasil kirim
+   laporan) ikut konsisten tanpa disentuh satu-satu di JSX. */
+.landing-wrapper {
+  --bs-primary: var(--pink-600);
+  --bs-primary-rgb: 189, 62, 108;
+}
+.landing-wrapper .btn-primary {
+  --bs-btn-bg: var(--pink-600);
+  --bs-btn-border-color: var(--pink-600);
+  --bs-btn-hover-bg: var(--pink-700);
+  --bs-btn-hover-border-color: var(--pink-700);
+  --bs-btn-active-bg: var(--pink-700);
+  --bs-btn-active-border-color: var(--pink-700);
+  --bs-btn-disabled-bg: var(--pink-600);
+  --bs-btn-disabled-border-color: var(--pink-600);
+  --bs-btn-focus-shadow-rgb: 189, 62, 108;
 }
 
 /* ============================================================
-   1. PANEL GRADIENT & DEKORASI  (landing + login)
-   Hero landing dan panel kiri login memakai gradient serta
-   lingkaran transparan yang sama persis, jadi didefinisikan
-   satu kali di sini.
-   ============================================================ */
-.hero-landing,
-.auth-left {
-  background: var(--grad-brand);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Lingkaran dekoratif. Di landing dipasang sebagai elemen sendiri
-   (.hero-glow-*) karena markup-nya sudah begitu; di login memakai
-   pseudo-element supaya tidak perlu elemen kosong tambahan. */
-.hero-glow-1,
-.hero-glow-2,
-.auth-left::before,
-.auth-left::after {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  background-color: var(--glow);
-  pointer-events: none;
-}
-.hero-glow-1,
-.auth-left::before {
-  top: -100px; right: -100px;
-  width: 400px; height: 400px;
-}
-.hero-glow-2,
-.auth-left::after {
-  bottom: -80px; left: -80px;
-  width: 300px; height: 300px;
-}
-
-/* ============================================================
-   2. LANDING — HEADER & HERO
+   1. HEADER & NAV
    ============================================================ */
 .header-premium {
-  background-color: var(--brand-950);
-  border-bottom: 1px solid rgba(11, 67, 112, 0.5);
+  background-color: var(--white);
+  border-bottom: 1px solid var(--sand-200);
   position: sticky;
   top: 0;
   z-index: 40;
 }
 
-.hero-landing {
-  padding-top: 4rem;
-  padding-bottom: 8rem;
+.header-logo {
+  width: 48px;
+  height: auto;
+}
+.header-brand-name {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--ink-900);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.header-brand-tagline {
+  font-size: 0.7rem;
+  color: var(--ink-500);
+  font-weight: 500;
+  margin-top: 2px;
 }
 
-/* Panel kaca "100% Rahasia & Aman" di sisi kanan hero */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-xl);
-  padding: 2rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  transition: transform 0.3s;
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
 }
-.glass-panel:hover {
-  transform: scale(1.02);
+.header-nav-link {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink-700);
+  transition: color 0.2s;
+}
+.header-nav-link:hover {
+  color: var(--pink-600);
+}
+@media (max-width: 900px) {
+  .header-nav { display: none !important; }
+}
+
+.header-admin-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-500);
+  cursor: pointer;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+.header-admin-link:hover {
+  color: var(--pink-600);
+}
+
+.header-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--sand-200);
+}
+
+.header-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.6rem 1.3rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, var(--pink-500), var(--pink-700));
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  box-shadow: var(--shadow-lift);
+  cursor: pointer;
+  transition: transform 0.2s;
+  white-space: nowrap;
+}
+.header-cta-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* ============================================================
+   2. HERO — BADGE, HEADLINE, CTA, ILUSTRASI
+   Background putih tenang; blob pink pucat + ilustrasi flat di
+   kanan menggantikan gradient gelap versi lama.
+   ============================================================ */
+.hero-landing {
+  background: var(--white);
+  padding: 3.5rem 0 2.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--pink-100);
+  color: var(--pink-700);
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  margin-bottom: 1.25rem;
+}
+
+.hero-title {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 2.5rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--ink-900);
+  margin-bottom: 1rem;
+}
+
+.hero-desc {
+  font-size: 1.05rem;
+  color: var(--ink-700);
+  line-height: 1.6;
+  margin-bottom: 1.75rem;
+  max-width: 32rem;
+}
+
+.hero-cta-group {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.btn-hero-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.85rem 1.6rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, var(--pink-500), var(--pink-700));
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: var(--shadow-lift);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.btn-hero-primary:hover {
+  transform: translateY(-2px);
+}
+
+.btn-hero-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.85rem 1.6rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--pink-300);
+  background: #fff;
+  color: var(--pink-700);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-hero-secondary:hover {
+  background: var(--pink-50);
+  border-color: var(--pink-400);
+}
+
+.hero-illustration-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hero-illustration-wrap svg {
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+}
+@media (max-width: 991px) {
+  .hero-landing { padding: 2rem 0 2.5rem; text-align: center; }
+  .hero-desc { margin-left: auto; margin-right: auto; }
+  .hero-cta-group { justify-content: center; }
+  .hero-illustration-wrap svg { max-width: 320px; margin-top: 1.5rem; }
 }
 
 /* ============================================================
@@ -96,25 +242,26 @@ body {
    ============================================================ */
 .form-card {
   background: white;
-  border-radius: var(--radius-xl);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  border: 1px solid var(--slate-100);
-  margin-top: -5rem; /* menumpuk di atas hero */
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lift);
+  border: 1px solid var(--sand-200);
+  margin-top: -2.5rem; /* overlap tipis ke hero, bukan menumpuk berat */
   position: relative;
   z-index: 20;
   overflow: hidden;
+  scroll-margin-top: 100px;
 }
 
 .tab-header {
-  background-color: var(--slate-050);
+  background-color: var(--sand-50);
   padding: 0.625rem;
-  border-bottom: 1px solid var(--slate-100);
+  border-bottom: 1px solid var(--sand-200);
   display: flex;
 }
 .tab-btn {
   flex: 1;
   padding: 1rem 1.5rem;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -126,21 +273,21 @@ body {
 }
 .tab-btn.active {
   background-color: white;
-  color: var(--brand-700);
+  color: var(--pink-700);
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 .tab-btn.inactive {
-  color: var(--slate-500);
+  color: var(--ink-500);
 }
 .tab-btn.inactive:hover {
-  color: var(--slate-800);
+  color: var(--ink-900);
 }
 
 /* ============================================================
    4. LANDING — KONTROL FORM
    ============================================================ */
 .form-label-premium {
-  color: var(--slate-700);
+  color: var(--ink-700);
   font-weight: 700;
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -151,10 +298,10 @@ body {
 .form-select-premium {
   width: 100%;
   padding: 0.75rem 1rem;
-  background-color: var(--slate-050);
-  border: 1px solid var(--slate-200);
+  background-color: var(--sand-50);
+  border: 1px solid var(--sand-200);
   border-radius: var(--radius-md);
-  color: var(--slate-800);
+  color: var(--ink-900);
   font-size: 0.875rem;
   font-weight: 500;
   transition: all 0.3s;
@@ -163,8 +310,8 @@ body {
 .form-select-premium:focus {
   outline: none;
   background-color: white;
-  border-color: var(--brand-500);
-  box-shadow: 0 0 0 4px rgba(14, 148, 235, 0.15);
+  border-color: var(--pink-500);
+  box-shadow: 0 0 0 4px rgba(214, 64, 126, 0.15);
 }
 
 /* Kolom yang nilainya berasal dari analisis cerita, bukan diketik pelapor.
@@ -173,8 +320,8 @@ body {
    disunting sendiri (lihat handleChange di LandingPage.jsx). */
 .form-control-premium.terisi-otomatis,
 .form-select-premium.terisi-otomatis {
-  background-color: #eff6ff;
-  border-color: var(--brand-500);
+  background-color: var(--pink-50);
+  border-color: var(--pink-500);
   border-left-width: 3px;
 }
 
@@ -189,14 +336,14 @@ body {
   align-items: center;
   gap: 0.75rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--slate-100);
+  border-bottom: 1px solid var(--sand-200);
   margin-bottom: 1.5rem;
 }
 .section-number {
   width: 1.75rem;
   height: 1.75rem;
-  background-color: var(--brand-050);
-  color: var(--brand-600);
+  background-color: var(--pink-100);
+  color: var(--pink-600);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -209,7 +356,7 @@ body {
 .alert-callout {
   background-color: #ecfdf5;
   border: 1px solid #d1fae5;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   padding: 1.25rem;
   display: flex;
   align-items: flex-start;
@@ -222,9 +369,9 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
-  background-color: var(--slate-050);
-  border: 1px solid var(--slate-100);
-  border-radius: var(--radius-lg);
+  background-color: var(--sand-50);
+  border: 1px solid var(--sand-200);
+  border-radius: var(--radius-md);
 }
 .toggle-switch {
   position: relative;
@@ -241,7 +388,7 @@ body {
   position: absolute;
   cursor: pointer;
   top: 0; left: 0; right: 0; bottom: 0;
-  background-color: var(--slate-300);
+  background-color: var(--sand-300);
   transition: 0.4s;
   border-radius: 2rem;
 }
@@ -257,7 +404,7 @@ body {
   border-radius: 50%;
 }
 input:checked + .slider {
-  background-color: var(--brand-600);
+  background-color: var(--pink-600);
 }
 input:checked + .slider::before {
   transform: translateX(1.25rem);
@@ -268,11 +415,11 @@ input:checked + .slider::before {
   font-family: monospace;
   font-size: 1.5rem;
   font-weight: 900;
-  color: #0d3d8e;
+  color: var(--pink-900);
   letter-spacing: 2px;
-  background: var(--brand-050);
+  background: var(--pink-50);
   padding: 0.75rem 1.5rem;
-  border: 1px solid #e0effe;
+  border: 1px solid var(--pink-200);
   border-radius: var(--radius-md);
   display: inline-block;
 }
@@ -289,14 +436,14 @@ input:checked + .slider::before {
   width: 3.5rem;
   height: 3.5rem;
   margin: 0 auto 1rem;
-  background: linear-gradient(135deg, var(--brand-500), #6366f1);
+  background: linear-gradient(135deg, var(--pink-500), var(--pink-700));
   border-radius: 1.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   font-size: 1.5rem;
-  box-shadow: 0 10px 20px -6px rgba(14, 148, 235, 0.4);
+  box-shadow: 0 10px 20px -6px rgba(156, 49, 89, 0.35);
 }
 
 /* Status "Menganalisis cerita Anda..." */
@@ -304,16 +451,16 @@ input:checked + .slider::before {
   display: flex;
   align-items: center;
   gap: 1rem;
-  background-color: var(--brand-050);
-  border: 1px solid #dbeafe;
-  border-radius: var(--radius-lg);
+  background-color: var(--pink-50);
+  border: 1px solid var(--pink-200);
+  border-radius: var(--radius-md);
   padding: 1rem 1.25rem;
 }
 .cerita-analyzing-spinner {
   width: 2rem;
   height: 2rem;
-  border: 3px solid #bfdbfe;
-  border-top-color: var(--brand-500);
+  border: 3px solid var(--pink-200);
+  border-top-color: var(--pink-500);
   border-radius: 50%;
   flex-shrink: 0;
   animation: spin 0.8s linear infinite;
@@ -331,20 +478,20 @@ input:checked + .slider::before {
   flex-direction: column;
   gap: 0.35rem;
   padding: 1rem 1.1rem;
-  background-color: var(--slate-050);
-  border: 1.5px solid var(--slate-200);
-  border-radius: 0.875rem;
+  background-color: var(--sand-50);
+  border: 1.5px solid var(--sand-200);
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
 }
 .preferensi-card:hover {
-  border-color: #93c5fd;
+  border-color: var(--pink-300);
   background-color: #fff;
 }
 .preferensi-card.selected {
-  border-color: var(--brand-500);
-  background-color: var(--brand-050);
-  box-shadow: 0 0 0 3px rgba(14, 148, 235, 0.12);
+  border-color: var(--pink-500);
+  background-color: var(--pink-50);
+  box-shadow: 0 0 0 3px rgba(214, 64, 126, 0.14);
 }
 .preferensi-card input[type="radio"] {
   position: absolute;
@@ -353,28 +500,28 @@ input:checked + .slider::before {
 }
 .preferensi-card-icon {
   font-size: 1.35rem;
-  color: var(--slate-400);
+  color: var(--sand-400);
   transition: color 0.2s;
 }
 .preferensi-card.selected .preferensi-card-icon {
-  color: var(--brand-600);
+  color: var(--pink-600);
 }
 .preferensi-card-label {
   font-weight: 700;
   font-size: 0.875rem;
-  color: var(--slate-800);
+  color: var(--ink-900);
 }
 .preferensi-card-desc {
   font-size: 0.75rem;
-  color: var(--slate-500);
+  color: var(--ink-500);
   line-height: 1.45;
 }
 
-/* Pernyataan kebenaran laporan */
+/* Pernyataan kebenaran laporan — amber, sengaja beda makna dari brand pink */
 .pernyataan-box {
   background-color: #fffbeb;
   border: 1px solid #fde68a;
-  border-radius: 0.875rem;
+  border-radius: var(--radius-md);
   padding: 1rem 1.1rem;
 }
 .pernyataan-box label {
@@ -429,12 +576,12 @@ input:checked + .slider::before {
   left: 0; right: 0; top: 50%;
   transform: translateY(-50%);
   height: 4px;
-  background-color: var(--slate-200);
+  background-color: var(--sand-200);
   z-index: 1;
 }
 .tracker-line-fill {
   height: 100%;
-  background-color: var(--brand-500);
+  background-color: var(--pink-500);
   transition: width 0.7s;
 }
 .tracker-step {
@@ -448,8 +595,8 @@ input:checked + .slider::before {
   width: 3rem;
   height: 3rem;
   background-color: white;
-  border: 4px solid var(--slate-200);
-  color: var(--slate-400);
+  border: 4px solid var(--sand-200);
+  color: var(--ink-500);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -458,7 +605,7 @@ input:checked + .slider::before {
   transition: all 0.3s;
 }
 .tracker-circle.completed {
-  background-color: var(--brand-600);
+  background-color: var(--pink-600);
   border-color: white;
   color: white;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -467,207 +614,8 @@ input:checked + .slider::before {
   font-size: 0.75rem;
   font-weight: 700;
   margin-top: 0.5rem;
-  color: var(--slate-400);
+  color: var(--ink-500);
 }
 .tracker-label.completed {
-  color: var(--brand-600);
-}
-
-/* ============================================================
-   7. LOGIN — TATA LETAK DUA KOLOM
-   ============================================================ */
-.auth-body {
-  display: flex;
-  min-height: 100vh;
-  background: #f9fafb;
-}
-
-.auth-left {
-  width: 42%;
-  padding: 48px;
-  display: flex;
-  align-items: center;
-  color: white;
-}
-.auth-left-content {
-  position: relative;
-  z-index: 1;
-}
-
-.auth-logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 48px;
-  color: white;
-  cursor: pointer;
-}
-.auth-logo-icon img,
-.auth-logo-icon svg {
-  width: 44px;
-  height: auto;
-}
-.auth-logo-main {
-  font-size: 22px;
-  font-weight: 900;
-  line-height: 1;
-}
-.auth-logo-sub {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 500;
-}
-
-.auth-left-title {
-  font-size: 32px;
-  font-weight: 800;
-  line-height: 1.3;
-  margin-bottom: 20px;
-}
-.auth-left-desc {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.8);
-  line-height: 1.7;
-}
-
-.auth-right {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 24px;
-}
-.auth-form-container {
-  width: 100%;
-  max-width: 400px;
-}
-
-/* Panel kiri disembunyikan di layar kecil supaya form dapat ruang penuh */
-@media (max-width: 768px) {
-  .auth-left { display: none; }
-  .auth-right { background: white; }
-}
-
-/* ============================================================
-   8. LOGIN — FORM & TOMBOL
-   ============================================================ */
-.auth-back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: var(--gray-500);
-  font-weight: 500;
-  margin-bottom: 32px;
-  transition: color 0.2s;
-}
-.auth-back-link:hover {
-  color: var(--indigo-600);
-}
-
-.auth-form-title {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--gray-900);
-  margin-bottom: 8px;
-}
-.auth-form-subtitle {
-  font-size: 15px;
-  color: var(--gray-500);
-  margin-bottom: 32px;
-}
-
-.form-label-custom {
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-  display: block;
-  margin-bottom: 8px;
-}
-.input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.input-icon {
-  position: absolute;
-  left: 14px;
-  color: var(--slate-400);
-  font-size: 18px;
-  pointer-events: none;
-}
-.form-input {
-  width: 100%;
-  padding: 12px 14px 12px 44px;
-  border: 1.5px solid #d1d5db;
-  border-radius: 12px;
-  font-size: 15px;
-  outline: none;
-  transition: all 0.2s;
-  background: white;
-}
-.form-input:focus {
-  border-color: var(--indigo-600);
-  box-shadow: 0 0 0 4px rgba(26, 86, 219, 0.1);
-}
-.input-toggle {
-  position: absolute;
-  right: 14px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--slate-400);
-  display: flex;
-  align-items: center;
-  font-size: 18px;
-}
-
-.btn-submit {
-  width: 100%;
-  padding: 14px;
-  background: var(--indigo-600);
-  color: white;
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-.btn-submit:hover {
-  background: var(--indigo-700);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(26, 86, 219, 0.2);
-}
-.btn-submit:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.auth-alert-error {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 12px;
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-  margin-bottom: 24px;
-  font-size: 14px;
-}
-
-/* Spinner kecil di tombol saat proses login (@keyframes spin di App.css) */
-.spinner-sm {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  color: var(--pink-600);
 }

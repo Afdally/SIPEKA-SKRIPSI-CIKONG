@@ -62,22 +62,36 @@ export default function DashboardDP3A() {
 
   const fetchAll = useCallback(async (tok) => {
     setLoading(true);
-    try {
-      const [reportsData, kasusData] = await Promise.all([
-        laporanService.getAll(tok || getToken()),
-        kasusService.getAll(tok || getToken()),
-      ]);
-      setReports(reportsData || []);
-      setKasusList(kasusData || []);
-    } catch (err) {
-      console.error(err);
-      if (err.response?.status === 401) {
-        localStorage.clear();
-        navigate('/login');
-      }
-    } finally {
-      setLoading(false);
+
+    // allSettled (bukan all): kasusList tetap tampil walau laporanService gagal
+    // (mis. report-service down), begitu juga sebaliknya -- satu service mati
+    // tidak boleh nge-blank-in data service lain yang sebenarnya sehat.
+    const [reportsResult, kasusResult] = await Promise.allSettled([
+      laporanService.getAll(tok || getToken()),
+      kasusService.getAll(tok || getToken()),
+    ]);
+
+    if (reportsResult.status === 'fulfilled') {
+      setReports(reportsResult.value || []);
+    } else {
+      console.error('Gagal ambil data laporan (report-service):', reportsResult.reason);
     }
+
+    if (kasusResult.status === 'fulfilled') {
+      setKasusList(kasusResult.value || []);
+    } else {
+      console.error('Gagal ambil data kasus (case-service):', kasusResult.reason);
+    }
+
+    const authError = [reportsResult, kasusResult].find(
+      (r) => r.status === 'rejected' && r.reason?.response?.status === 401
+    );
+    if (authError) {
+      localStorage.clear();
+      navigate('/login');
+    }
+
+    setLoading(false);
   }, [navigate]);
 
   useEffect(() => {
@@ -397,7 +411,7 @@ export default function DashboardDP3A() {
               return (
                 <>
                   <div className="row g-3 mb-4">
-                    <StatCard icon="bi-file-earmark-text" iconBg="#eff6ff" iconColor="#2563eb" label="Total Laporan" value={allDataForCharts.length} />
+                    <StatCard icon="bi-file-earmark-text" iconBg="#fdf2f8" iconColor="#db2777" label="Total Laporan" value={allDataForCharts.length} />
                     <StatCard icon="bi-exclamation-circle" iconBg="#fef2f2" iconColor="#dc2626" label="Pengaduan Baru" value={lapBaru.length} />
                     <StatCard icon="bi-briefcase" iconBg="#fffbeb" iconColor="#d97706" label="Sedang Diproses" value={kasAktif.length} />
                     <StatCard icon="bi-check-circle" iconBg="#f0fdf4" iconColor="#16a34a" label="Selesai / Terminasi" value={kasSels.length} />
