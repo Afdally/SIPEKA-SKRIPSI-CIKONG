@@ -1,0 +1,13 @@
+{
+  "name": "sipeka-loadtest-tools",
+  "version": "1.0.0",
+  "description": "Penyiap data uji beban untuk perbandingan arsitektur SIPEKA",
+  "private": true,
+  "scripts": {
+    "seed:micro": "node seed-loadtest-data.js micro --yes",
+    "seed:mono": "node seed-loadtest-data.js mono --yes"
+  },
+  "dependencies": {
+    "mongodb": "^6.8.0"
+  }
+}

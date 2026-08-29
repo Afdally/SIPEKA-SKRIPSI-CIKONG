@@ -40,6 +40,11 @@ services:
       dockerfile: Dockerfile
     container_name: ircm-report-service
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
     environment:
       MONGODB_URI: mongodb://mongodb:27017/report_db
       JWT_SECRET: ircm_secret_key
@@ -80,6 +85,11 @@ services:
       dockerfile: Dockerfile
     container_name: ircm-case-service
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
     environment:
       MONGODB_URI: mongodb://mongodb:27017/case_db
       JWT_SECRET: ircm_secret_key
@@ -102,6 +112,69 @@ services:
     depends_on:
       - mongodb
       - rabbitmq
+    networks:
+      - ircm-network
+
+  # ============================================
+  # MONOLITH SERVICE (pembanding arsitektur, load testing)
+  # case-service + reporting-service digabung jadi satu app Express, resource
+  # dibatasi sama seperti masing-masing service microservices di atas (fair
+  # comparison). Diakses langsung lewat port sendiri, di luar API Gateway,
+  # karena bukan bagian dari sistem produksi — murni untuk Tabel 5.x load
+  # testing JMeter (lihat SKRIPSI_REVISI_CONTEXT.md).
+  # ============================================
+
+  monolith-service:
+    build:
+      context: ./backend/monolith-service
+      dockerfile: Dockerfile
+    container_name: ircm-monolith-service
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/monolith_db
+      JWT_SECRET: ircm_secret_key
+      JWT_TTL: 3600
+      PORT: 8000
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Makassar}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      REPORTING_SERVICE_URL: http://localhost:8000
+      PETUGAS_DASHBOARD_URL: ${PETUGAS_DASHBOARD_URL:-http://localhost}
+      EMAIL_REMINDER_POLL_MINUTES: ${EMAIL_REMINDER_POLL_MINUTES:-5}
+      EMAIL_REMINDER_AFTER_MINUTES: ${EMAIL_REMINDER_AFTER_MINUTES:-30}
+      EMAIL_REMINDER_LEASE_MINUTES: ${EMAIL_REMINDER_LEASE_MINUTES:-15}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gemini-2.5-flash}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai}
+      LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-20000}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      XAI_MODEL: ${XAI_MODEL:-grok-4.5}
+      XAI_BASE_URL: ${XAI_BASE_URL:-https://api.x.ai/v1}
+      XAI_TIMEOUT_MS: ${XAI_TIMEOUT_MS:-20000}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
+      OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-45000}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-10m}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8090:8000"
+    volumes:
+      - ./backend/monolith-service:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      - mongodb
     networks:
       - ircm-network
 

@@ -1,0 +1,12 @@
+{
+  "name": "sipeka-fault-injection",
+  "version": "1.0.0",
+  "description": "Pengujian ketahanan penyelarasan status SIPEKA saat report-service dimatikan",
+  "private": true,
+  "scripts": {
+    "uji": "node uji-ketahanan.js"
+  },
+  "dependencies": {
+    "mongodb": "^6.8.0"
+  }
+}

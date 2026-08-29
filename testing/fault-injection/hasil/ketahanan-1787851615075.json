@@ -1,0 +1,24 @@
+[
+  {
+    "kondisi": "sinkron",
+    "dikirim": 200,
+    "gagalSeketika": 200,
+    "tertahanDiAntrean": 0,
+    "tersinkron": 0,
+    "hilangPermanen": 200,
+    "keberhasilanPersen": 0,
+    "durasiKirimDetik": 35.12,
+    "waktuPengosonganAntreanDetik": null
+  },
+  {
+    "kondisi": "broker",
+    "dikirim": 200,
+    "gagalSeketika": 0,
+    "tertahanDiAntrean": 200,
+    "tersinkron": 200,
+    "hilangPermanen": 0,
+    "keberhasilanPersen": 100,
+    "durasiKirimDetik": 2.38,
+    "waktuPengosonganAntreanDetik": 23.71
+  }
+]

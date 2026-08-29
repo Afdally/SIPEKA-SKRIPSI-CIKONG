@@ -14,12 +14,12 @@ import { cocokDenganFilterKategori, kategoriKorban } from '../utils/kategoriKorb
 import './Dashboard.css';
 
 const METODE_LIST = ['Konsultasi / Mediasi', 'Psikososial', 'Bantuan Hukum'];
-const METODE_PERTEMUAN_LIST = ['Datang ke UPTD', 'Petugas Mendatangi Korban'];
+const METODE_PERTEMUAN_LIST = ['Datang ke DP3A/UPTD', 'Petugas Mendatangi Korban'];
 
 const MENU_ITEMS = [
   { id: 'beranda', icon: 'bi-grid-1x2-fill', label: 'Dashboard' },
   { id: 'penanganan', icon: 'bi-briefcase-fill', label: 'Penanganan Kasus' },
-  { id: 'arsip', icon: 'bi-archive-fill', label: 'Arsip & Selesai' },
+  { id: 'arsip', icon: 'bi-archive-fill', label: 'Arsip Laporan' },
 ];
 
 const STEP_STAGES = [
@@ -396,7 +396,7 @@ export default function DashboardDP3A() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h6 className="d-flex align-items-center gap-2">
               <img src={logo} alt="Logo" style={{ width: '32px', height: 'auto' }} />
-              UPTD PPA
+              DP3A Kota Kendari
             </h6>
             {/* Tombol tutup sidebar di mobile */}
             <button
@@ -418,7 +418,7 @@ export default function DashboardDP3A() {
             </div>
           ))}
         </nav>
-        <SidebarUserMenu user={user} roleLabel="Petugas UPTD" onLogout={handleLogout} />
+        <SidebarUserMenu user={user} roleLabel="Petugas" onLogout={handleLogout} />
       </div>
 
       {/* MAIN CONTENT */}

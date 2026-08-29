@@ -119,7 +119,7 @@ export default function LoginPage() {
         {/* Sapaan */}
         <div className="tw-relative tw-z-10">
           <h1 className="tw-mb-3 tw-text-3xl tw-font-bold tw-leading-snug">
-            Selamat Datang,<br />Petugas UPTD PPA
+            Selamat Datang Petugas 
           </h1>
           <p className="tw-max-w-sm tw-text-sm tw-leading-relaxed tw-text-white/75">
             Masuk untuk menerima laporan, melakukan assessment, dan menangani kasus kekerasan perempuan dan anak secara responsif.

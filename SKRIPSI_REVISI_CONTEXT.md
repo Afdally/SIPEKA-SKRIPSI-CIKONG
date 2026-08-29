@@ -255,14 +255,72 @@ Yang perlu diubah hanya bagian tulisan: **rumusan masalah, tujuan, dan kesimpula
 Kode tidak berubah sama sekali. Rumusan masalah baru harus berbentuk pertanyaan yang tetap
 valid walau jawabannya "tidak sesuai" — user yang merumuskan kalimat finalnya sendiri.
 
-**STATUS: usulan, belum disetujui pembimbing.** Jangan tulis ke BAB apa pun sebelum ada
-persetujuan eksplisit. Jangan juga menulis justifikasi lama seolah wawancara ini tidak
-pernah terjadi.
+**STATUS (update 2026-08-25): DISETUJUI (implisit) oleh pembimbing.** User konsultasi,
+pembimbing jawab "lanjut saja" — tidak terlalu paham detail arsitektur, jadi tidak akan
+banyak menekan soal justifikasi teknis. Boleh mulai tulis BAB dengan framing ini.
+
+## Rencana Pembanding Monolitik (ditambahkan 2026-08-25)
+
+Preseden: skripsi **Al Zidni Kasim (TI UHO, 2024)**, "Desain dan Implementasi Arsitektur
+Microservices pada Sistem Informasi Perpustakaan" (`C:\Users\cikoh\Downloads\SKRIPSI.pdf`).
+Bangun microservices DAN monolitik (fungsi sama, resource Docker disamakan), JMeter load
+test, bandingkan response time/throughput/error rate (Tabel 5.5). Hasil: microservices
+lebih cepat tapi monolitik error rate lebih rendah di sebagian endpoint — nuanced.
+
+**SIPEKA akan dibangun versi monolitik juga**, sebagai eksperimen TERPISAH dari
+fault-injection RabbitMQ (beda variabel bebas/terikat, tidak boleh digabung satu tabel):
+
+1. **Load testing microservices vs monolitik** (baru) — jenis arsitektur → response
+   time/throughput/error rate (JMeter). Ikuti pola Tabel 5.5 referensi di atas.
+2. **Fault-injection RabbitMQ** (sudah ada di rencana sejak Juli) — report-service mati,
+   dengan vs tanpa broker → % status tersinkron. Hanya berlaku di sistem microservices;
+   monolitik tidak relevan (satu proses, tidak ada failure mode antar-service).
+
+Implementasi monolitik: gabungkan codebase `case-service` + `reporting-service` jadi
+satu app Express (satu stack Node.js/MongoDB), ganti panggilan RabbitMQ/HTTP dengan
+pemanggilan fungsi langsung. Kode RabbitMQ yang sudah ada di `case-service`/
+`reporting-service` **tidak disentuh** — tetap dipakai penuh untuk eksperimen #2.
+
+## Revisi Tabel 3.5 — Skenario Pengujian Performa (2026-08-25)
+
+Tabel 3.5 versi proposal (login, POST laporan, GET penanganan) punya celah: **ketiganya
+single-service**, tidak ada yang melewati jalur komunikasi antar-service. Jadi load test
+versi itu tidak pernah menguji hal yang justru membedakan kedua arsitektur. Set endpoint
+direvisi jadi 5 (tetap 50/100/150 VU):
+
+| # | Endpoint | Method | Karakter | Status |
+|---|---|---|---|---|
+| 1 | `/api/master/kekerasan` | GET | Baseline ringan, publik — isolasi overhead API Gateway | baru |
+| 2 | `/api/auth/login` | POST | Terikat CPU (bcrypt cost 10) | dari proposal |
+| 3 | `/api/laporan` | POST | Tulis publik | dari proposal |
+| 4 | `/api/penanganan` | GET | Baca terproteksi JWT | dari proposal |
+| 5 | `/api/penanganan/registrasi` | POST | **Tulis lintas-service** (RabbitMQ) | baru |
+
+`POST /api/laporan/analisis-kronologi` **dikecualikan** — manggil LLM eksternal (timeout
+45 detik) + ada rate limiter 10/window, yang terukur akan jadi performa Ollama dan 429
+buatan, bukan arsitektur. Alasan pengecualian ini sebaiknya ditulis eksplisit di BAB III.
+
+Catatan interpretasi untuk BAB IV:
+- EP2 akan berat di kedua arsitektur karena bcrypt, bukan karena arsitektur.
+- EP5 kemungkinan microservices lebih cepat (publish fire-and-forget balik duluan,
+  update `Laporan` dikerjakan consumer belakangan) — itu kerja yang ditunda + eventual
+  consistency, bukan kecepatan gratis. Bahan diskusi yang bagus.
+- Total resource TIDAK sama (microservices 2 kontainer = 1,0 CPU; monolitik 1 = 0,5 CPU,
+  belum termasuk nginx + RabbitMQ). Batas per-kontainer sama rata mengikuti pola
+  referensi. Laporkan tabel footprint-nya apa adanya — kebutuhan resource lebih besar
+  itu memang biaya melekat microservices dan bagian dari yang dievaluasi.
+
+Instrumen sudah dibuat di `testing/jmeter/` (test plan `.jmx`, penyiap data + CSV
+`laporan_id`, skrip runner PowerShell, README lengkap). **Belum pernah dijalankan** —
+JMeter belum terpasang saat instrumen dibuat.
 
 ## Langkah Selanjutnya
 
-1. Konsultasi ke pembimbing membawa hasil wawancara + usulan framing evaluasi (prioritas).
-2. Selesaikan pengujian fault-injection JMeter (data ini jadi inti kontribusi di framing baru).
-3. UAT di UPTD PPA — catatan: laptop user rusak (harus selalu dicas), perlu solusi
+1. ✅ Konsultasi ke pembimbing — dijawab "lanjut saja" (2026-08-25).
+2. ✅ Bangun versi monolitik SIPEKA (`backend/monolith-service/`, 2026-08-25).
+3. ⬜ Load testing JMeter: microservices vs monolitik — instrumen siap di
+   `testing/jmeter/`, tinggal pasang JMeter dan jalankan `jalankan-pengujian.ps1`.
+4. ⬜ Selesaikan pengujian fault-injection JMeter untuk RabbitMQ (eksperimen terpisah).
+5. ⬜ UAT di UPTD PPA — catatan: laptop user rusak (harus selalu dicas), perlu solusi
    akses (power bank laptop / deploy sementara ke cloud / lewat Diskominfo).
-4. Baru menyusun BAB IV-V setelah framing disetujui.
+6. ⬜ Susun BAB IV-V (framing sudah disetujui, boleh mulai).

@@ -38,3 +38,14 @@ coverage/
 ~*.tmp
 Thumbs.db
 .DS_Store
+
+# Hasil & data uji beban JMeter
+testing/jmeter/hasil/
+testing/jmeter/laporan_ids_*.csv
+testing/jmeter/hasil-campuran/
+testing/jmeter/jmeter.log
+
+docker-compose.campuran.yml
+
+# Eksperimen backend monolith — lokal saja, sengaja tidak di-push
+backend/monolith-service/
