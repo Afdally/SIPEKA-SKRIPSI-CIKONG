@@ -7,7 +7,10 @@ exports.index = async (req, res) => {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
 
-    const data = await Kasus.find(filter).sort({ createdAt: -1 });
+    // .lean() melewatkan hidrasi Mongoose (getter, setter, pelacakan
+    // perubahan) yang tidak dipakai sama sekali karena hasilnya langsung
+    // diserialkan jadi JSON. Bentuk JSON-nya identik dengan dokumen ter-hidrasi.
+    const data = await Kasus.find(filter).sort({ createdAt: -1 }).lean();
     return res.json(data);
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });

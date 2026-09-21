@@ -41,7 +41,8 @@ exports.getPublicGis = async (req, res) => {
     // Data sengaja diseleksi (select) untuk membuang field identitas korban/pelapor demi privasi
     const data = await Laporan.find({})
       .select('kode_laporan jenis_kekerasan tanggal_kejadian kelurahan_korban lokasi_kejadian latitude longitude status createdAt -_id')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     return res.json({
       message: 'Data Spasial Laporan SIPEKA (Anonim)',
@@ -83,7 +84,7 @@ exports.getGisMap = async (req, res) => {
     const data = await Laporan.find({
       latitude: { $ne: null },
       longitude: { $ne: null }
-    }).select('kode_laporan jenis_kekerasan tanggal_kejadian lokasi_kejadian latitude longitude status');
+    }).select('kode_laporan jenis_kekerasan tanggal_kejadian lokasi_kejadian latitude longitude status').lean();
 
     return res.json(data);
   } catch (err) {
@@ -96,7 +97,10 @@ exports.index = async (req, res) => {
   try {
     const filter = {};
 
-    const laporans = await Laporan.find(filter).sort({ createdAt: -1 });
+    // .lean() sekaligus menghapus kebutuhan .toObject() di bawah: dokumennya
+    // sudah berupa objek biasa, dan tipe Date tetap utuh sehingga pemformatan
+    // tanggal di bawah tidak berubah.
+    const laporans = await Laporan.find(filter).sort({ createdAt: -1 }).lean();
 
     // `tanggal_kejadian` dibiarkan tetap ISO supaya di sisi klien masih bisa
     // diurutkan, difilter rentang tanggal, dan diekspor sebagai tipe tanggal
@@ -105,7 +109,7 @@ exports.index = async (req, res) => {
     // selalu Invalid Date (tanggal di tabel jadi "-" dan filter tanggal diam-diam
     // tidak menyaring apa pun).
     const data = laporans.map(l => ({
-      ...l.toObject(),
+      ...l,
       id: l._id,
       tanggal_kejadian_format: l.tanggal_kejadian ? l.tanggal_kejadian.toLocaleDateString('id-ID') : '-',
       tanggal_lapor: l.createdAt.toLocaleDateString('id-ID'),

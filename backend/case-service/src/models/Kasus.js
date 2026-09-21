@@ -46,4 +46,14 @@ const kasusSchema = new mongoose.Schema({
   arsip:           { type: Boolean, default: false },
 }, { timestamps: true });
 
+// Registrasi mengecek duplikat lewat findOne({ laporan_id }) sebelum membuat
+// kasus. Tanpa indeks ini MongoDB memindai seluruh koleksi tiap kali, jadi
+// biaya registrasi tumbuh linear mengikuti jumlah kasus yang sudah ada.
+kasusSchema.index({ laporan_id: 1 });
+
+// Daftar kasus selalu diurutkan terbaru dulu (lihat kasusController.index),
+// dan sebagian dipanggil dengan filter status.
+kasusSchema.index({ createdAt: -1 });
+kasusSchema.index({ status: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Kasus', kasusSchema);

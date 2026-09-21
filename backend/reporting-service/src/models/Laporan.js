@@ -46,6 +46,11 @@ const laporanSchema = new mongoose.Schema({
   email_reminder_claim_token: { type: String, default: null },
 }, { timestamps: true });
 
+// Daftar laporan selalu diurutkan terbaru dulu (laporanController.index dan
+// getPublicGis), dan worker email reminder menyaring berdasarkan status.
+laporanSchema.index({ createdAt: -1 });
+laporanSchema.index({ status: 1, createdAt: 1 });
+
 laporanSchema.pre('save', function(next) {
   if (this.kode_laporan) return next();
 

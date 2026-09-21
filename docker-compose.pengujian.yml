@@ -1,0 +1,16 @@
+# Mode load testing: data awal kedua arsitektur berasal dari salinan yang sama.
+# Aktifkan: docker compose -f docker-compose.yml -f docker-compose.pengujian.yml up -d --no-deps case-service report-service monolith-service
+# Kembali ke data aplikasi: docker compose -f docker-compose.yml up -d --no-deps case-service report-service monolith-service
+# Data berubah setelah POST /api/laporan; salinan ini bukan reset otomatis tiap run.
+services:
+  case-service:
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/uji_final_1789353000_case
+      SMTP_HOST: ""
+  report-service:
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/uji_final_1789353000_report
+  monolith-service:
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/uji_final_1789353000_mono
+      SMTP_HOST: ""

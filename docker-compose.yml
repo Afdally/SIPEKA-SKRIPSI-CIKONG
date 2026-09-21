@@ -1,6 +1,9 @@
 services:
   # ============================================
-  # DATABASE (1 MongoDB)
+  # DATABASE (1 MongoDB, database privat per service:
+  # case_db / report_db / monolith_db — Database per Service pattern
+  # (Richardson, 2018) tidak menuntut server terpisah, cukup data privat
+  # yang tidak diakses langsung oleh service lain)
   # ============================================
 
   mongodb:
@@ -43,7 +46,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '1'
           memory: 512M
     environment:
       MONGODB_URI: mongodb://mongodb:27017/report_db
@@ -88,8 +91,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '1'
           memory: 512M
+    ports:
+      - "127.0.0.1:8081:8000"
     environment:
       MONGODB_URI: mongodb://mongodb:27017/case_db
       JWT_SECRET: ircm_secret_key
@@ -117,11 +122,9 @@ services:
 
   # ============================================
   # MONOLITH SERVICE (pembanding arsitektur, load testing)
-  # case-service + reporting-service digabung jadi satu app Express, resource
-  # dibatasi sama seperti masing-masing service microservices di atas (fair
-  # comparison). Diakses langsung lewat port sendiri, di luar API Gateway,
-  # karena bukan bagian dari sistem produksi — murni untuk Tabel 5.x load
-  # testing JMeter (lihat SKRIPSI_REVISI_CONTEXT.md).
+  # case-service + reporting-service digabung menjadi satu aplikasi Express.
+  # JMeter mengaksesnya melalui gateway port 8090, dengan timeout yang sama
+  # seperti microservices. Batas resource per container bukan total arsitektur.
   # ============================================
 
   monolith-service:
@@ -133,7 +136,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '1'
           memory: 512M
     environment:
       MONGODB_URI: mongodb://mongodb:27017/monolith_db
@@ -168,8 +171,6 @@ services:
       OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-10m}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    ports:
-      - "8090:8000"
     volumes:
       - ./backend/monolith-service:/usr/src/app
       - /usr/src/app/node_modules
@@ -186,8 +187,13 @@ services:
     image: nginx:1.31.3-alpine
     container_name: ircm-api-gateway
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 8192
     ports:
       - "8080:80"
+      - "8090:8090"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:

@@ -28,7 +28,8 @@ mongoose.connect(MONGODB_URI)
     await seedMetode(); // Auto-seeding master data
     await seedAuth();   // Auto-seeding default users
     startEmailReminderWorker();
-    app.listen(PORT, '0.0.0.0', () => {
+    // Antrean koneksi masuk untuk lonjakan beban; dibatasi juga oleh somaxconn.
+    app.listen(PORT, '0.0.0.0', 4096, () => {
       console.log(`🚀 Case Service berjalan di http://0.0.0.0:${PORT}`);
     });
   })
