@@ -887,6 +887,8 @@ export default function DashboardSuperAdmin() {
                     <th>Kode</th>
                     <th>Tgl Kejadian</th>
                     <th>Nama Korban</th>
+                    <th>NIK Pelapor</th>
+                    <th>NIK Korban</th>
                     <th>Wilayah</th>
                     <th>Kekerasan</th>
                     <th>Kategori</th>
@@ -907,6 +909,8 @@ export default function DashboardSuperAdmin() {
                         <div className="fw-semibold text-dark">{r.nama_korban}</div>
                         <div className="text-muted" style={{ fontSize: '0.76rem' }}>{r.usia_korban} Thn &middot; {r.jenis_kelamin}</div>
                       </td>
+                      <td><span style={{ fontSize: '0.82rem' }}>{r.nik_pelapor || '-'}</span></td>
+                      <td><span style={{ fontSize: '0.82rem' }}>{r.nik_korban || '-'}</span></td>
                       <td><span style={{ fontSize: '0.82rem' }}>{r.kelurahan_korban}</span></td>
                       <td><span style={{ fontSize: '0.82rem' }}>{r.jenis_kekerasan}</span></td>
                       <td>

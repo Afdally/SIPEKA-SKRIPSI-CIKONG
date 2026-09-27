@@ -1,4 +1,12 @@
 const Laporan = require('../models/Laporan');
+const { normalizeNik, isValidNik, nikForRole } = require('../utils/nik');
+
+function serializeReportForRole(report, role) {
+  const data = { ...report };
+  data.nik_pelapor = nikForRole(data.nik_pelapor, role);
+  data.nik_korban = nikForRole(data.nik_korban, role);
+  return data;
+}
 
 // POST /api/laporan
 exports.store = async (req, res) => {
@@ -11,6 +19,12 @@ exports.store = async (req, res) => {
     // Dikirim sebagai string dari FormData, disamakan seperti `anonim` di atas
     if (data.pernyataan_benar === 'true') data.pernyataan_benar = true;
     if (data.pernyataan_benar === 'false') data.pernyataan_benar = false;
+
+    data.nik_pelapor = normalizeNik(data.nik_pelapor);
+    data.nik_korban = normalizeNik(data.nik_korban);
+    if (!isValidNik(data.nik_pelapor) || !isValidNik(data.nik_korban)) {
+      return res.status(422).json({ message: 'NIK harus terdiri dari 16 digit angka.' });
+    }
 
     if (data.anonim) {
       data.nama_pelapor = 'ANONIM';
@@ -109,7 +123,7 @@ exports.index = async (req, res) => {
     // selalu Invalid Date (tanggal di tabel jadi "-" dan filter tanggal diam-diam
     // tidak menyaring apa pun).
     const data = laporans.map(l => ({
-      ...l,
+      ...serializeReportForRole(l, req.auth_user?.role),
       id: l._id,
       tanggal_kejadian_format: l.tanggal_kejadian ? l.tanggal_kejadian.toLocaleDateString('id-ID') : '-',
       tanggal_lapor: l.createdAt.toLocaleDateString('id-ID'),
@@ -128,7 +142,7 @@ exports.show = async (req, res) => {
 
     if (!laporan) return res.status(404).json({ message: 'Tidak ditemukan' });
 
-    return res.json({ data: laporan });
+    return res.json({ data: serializeReportForRole(laporan.toObject(), req.auth_user?.role) });
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });
   }
@@ -147,7 +161,7 @@ exports.updateStatus = async (req, res) => {
 
     if (!laporan) return res.status(404).json({ message: 'Tidak ditemukan' });
 
-    return res.json({ message: 'Status laporan diperbarui', data: laporan });
+    return res.json({ message: 'Status laporan diperbarui', data: serializeReportForRole(laporan.toObject(), req.auth_user?.role) });
   } catch (err) {
     return res.status(500).json({ message: 'Server error' });
   }

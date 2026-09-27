@@ -774,6 +774,14 @@ export default function DashboardDP3A() {
                           <span className="fw-bold">{getInitials(detailData.nama_korban)}</span>
                         </div>
                         <div className="col-6">
+                          <label className="small text-muted d-block mb-1">NIK Pelapor</label>
+                          <span className="fw-bold">{detailData.nik_pelapor || '-'}</span>
+                        </div>
+                        <div className="col-6">
+                          <label className="small text-muted d-block mb-1">NIK Korban</label>
+                          <span className="fw-bold">{detailData.nik_korban || '-'}</span>
+                        </div>
+                        <div className="col-6">
                           <label className="small text-muted d-block mb-1">Gender Korban</label>
                           <span className="fw-bold">{detailData.jenis_kelamin}</span>
                         </div>

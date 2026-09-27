@@ -410,6 +410,12 @@ export default function LandingPage() {
                     </div>
 
                     <div className="col-md-6">
+                      <label className="form-label-premium">NIK Pelapor</label>
+                      <input name="nikPelapor" type="text" inputMode="numeric" maxLength={16} pattern="[0-9]{16}" className="form-control-premium" value={formData.nikPelapor} onChange={handleChange} placeholder="16 digit NIK" />
+                      <small className="text-muted">Opsional, diisi manual dan tidak dianalisis oleh LLM.</small>
+                    </div>
+
+                    <div className="col-md-6">
                       <label className="form-label-premium">Hubungan dg Korban <span className="text-danger">*</span></label>
                       <select name="hubunganKorban" className={kelasInput('form-select-premium', 'hubunganKorban')} required value={formData.hubunganKorban} onChange={handleChange}>
                         <option value="">-- Pilih --</option>
@@ -438,6 +444,11 @@ export default function LandingPage() {
                     <select name="jenisKelamin" className={kelasInput('form-select-premium', 'jenisKelamin')} required value={formData.jenisKelamin} onChange={handleChange}>
                       <option value="">-- Pilih --</option><option>Laki-laki</option><option>Perempuan</option>
                     </select>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label-premium">NIK Korban</label>
+                    <input name="nikKorban" type="text" inputMode="numeric" maxLength={16} pattern="[0-9]{16}" className="form-control-premium" value={formData.nikKorban} onChange={handleChange} placeholder="16 digit NIK" />
+                    <small className="text-muted">Opsional, diisi manual dan tidak dianalisis oleh LLM.</small>
                   </div>
                   <div className="col-md-7">
                     <label className="form-label-premium">Alamat Detail Korban <span className="text-danger">*</span></label>
