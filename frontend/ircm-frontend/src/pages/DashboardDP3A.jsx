@@ -22,6 +22,19 @@ const MENU_ITEMS = [
   { id: 'arsip', icon: 'bi-archive-fill', label: 'Arsip Laporan' },
 ];
 
+function PaginationBar({ page, pageCount, onPageChange, total }) {
+  if (pageCount <= 1) return null;
+  return (
+    <div className="d-flex justify-content-between align-items-center px-3 py-3 border-top bg-light-subtle">
+      <small className="text-muted">Menampilkan halaman {page} dari {pageCount} ({total} data)</small>
+      <div className="btn-group btn-group-sm" role="group" aria-label="Pagination">
+        <button className="btn btn-outline-secondary" disabled={page === 1} onClick={() => onPageChange(page - 1)}>Sebelumnya</button>
+        <button className="btn btn-outline-secondary" disabled={page === pageCount} onClick={() => onPageChange(page + 1)}>Berikutnya</button>
+      </div>
+    </div>
+  );
+}
+
 const STEP_STAGES = [
   { id: 'pengaduan', label: 'Pengaduan' },
   { id: 'registrasi', label: 'Registrasi' },
@@ -53,6 +66,9 @@ export default function DashboardDP3A() {
   const [filterKategori, setFilterKategori] = useState('');
   const [hanyaLaporanBaru, setHanyaLaporanBaru] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activePage, setActivePage] = useState(1);
+  const [archivePage, setArchivePage] = useState(1);
+  const PAGE_SIZE = 10;
   const [bannerLaporanDitutup, setBannerLaporanDitutup] = useState(false);
   const jumlahLaporanBaruSebelumnya = useRef(null);
   const generasiFetch = useRef(0);
@@ -234,8 +250,6 @@ export default function DashboardDP3A() {
     }
   };
 
-  if (!user) return null;
-
   // ==================== DERIVED DATA ====================
   // Data mentah (reports, kasusList) digabung/difilter di sini untuk keperluan tampilan.
   // Tidak ada state terpisah supaya selalu konsisten dengan data terbaru dari fetchAll().
@@ -299,6 +313,22 @@ export default function DashboardDP3A() {
     }
     return true;
   });
+
+  const activePageCount = Math.max(1, Math.ceil(filteredActiveList.length / PAGE_SIZE));
+  const archivePageCount = Math.max(1, Math.ceil(filteredKasSels.length / PAGE_SIZE));
+  const visibleActiveList = filteredActiveList.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE);
+  const visibleKasSels = filteredKasSels.slice((archivePage - 1) * PAGE_SIZE, archivePage * PAGE_SIZE);
+
+  useEffect(() => { setActivePage(1); }, [searchQuery, filterKategori, hanyaLaporanBaru]);
+  useEffect(() => { setArchivePage(1); }, [searchQuery, filterKategori]);
+  useEffect(() => {
+    if (activePage > activePageCount) setActivePage(activePageCount);
+  }, [activePage, activePageCount]);
+  useEffect(() => {
+    if (archivePage > archivePageCount) setArchivePage(archivePageCount);
+  }, [archivePage, archivePageCount]);
+
+  if (!user) return null;
 
   // Data lengkap untuk detail satu laporan/kasus yang lagi dibuka
   let detailData = null;
@@ -439,6 +469,13 @@ export default function DashboardDP3A() {
           </div>
         </div>
 
+        {loading && (
+          <div className="alert alert-light border shadow-sm d-flex align-items-center gap-2 mb-4" role="status" aria-live="polite">
+            <span className="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span>
+            <span>Sedang memuat data laporan dan kasus...</span>
+          </div>
+        )}
+
         {/* LIST MODE */}
         {viewMode === 'list' && (
           <>
@@ -563,7 +600,7 @@ export default function DashboardDP3A() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredActiveList.map(item => (
+                        {visibleActiveList.map(item => (
                           <tr key={item.id || item._id}>
                             <td>
                               <div className="fw-bold text-dark">{item.kode_laporan}</div>
@@ -598,6 +635,7 @@ export default function DashboardDP3A() {
                         ))}
                       </tbody>
                     </table>
+                    <PaginationBar page={activePage} pageCount={activePageCount} onPageChange={setActivePage} total={filteredActiveList.length} />
                   </div>
                 )}
               </div>
@@ -649,7 +687,7 @@ export default function DashboardDP3A() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredKasSels.map(k => (
+                        {visibleKasSels.map(k => (
                           <tr key={k._id}>
                             <td><div className="fw-bold text-dark">{k.kode_laporan}</div></td>
                             <td className="small text-muted fw-semibold">{new Date(k.tanggal_selesai).toLocaleDateString('id-ID')}</td>
@@ -673,6 +711,7 @@ export default function DashboardDP3A() {
                         ))}
                       </tbody>
                     </table>
+                    <PaginationBar page={archivePage} pageCount={archivePageCount} onPageChange={setArchivePage} total={filteredKasSels.length} />
                   </div>
                 )}
               </div>

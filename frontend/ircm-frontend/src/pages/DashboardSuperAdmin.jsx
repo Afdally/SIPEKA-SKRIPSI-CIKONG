@@ -52,6 +52,19 @@ const MENU_ITEMS = [
   { id: 'export', icon: 'bi-file-earmark-spreadsheet-fill', label: 'Data Pelaporan' },
 ];
 
+function ReportPagination({ page, pageCount, onPageChange, total }) {
+  if (pageCount <= 1) return null;
+  return (
+    <div className="d-flex justify-content-between align-items-center px-3 py-3 border-top bg-light-subtle">
+      <small className="text-muted">Menampilkan halaman {page} dari {pageCount} ({total} data)</small>
+      <div className="btn-group btn-group-sm" role="group" aria-label="Pagination data pelaporan">
+        <button className="btn btn-outline-secondary" disabled={page === 1} onClick={() => onPageChange(page - 1)}>Sebelumnya</button>
+        <button className="btn btn-outline-secondary" disabled={page === pageCount} onClick={() => onPageChange(page + 1)}>Berikutnya</button>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardSuperAdmin() {
   const navigate = useNavigate();
 
@@ -60,6 +73,7 @@ export default function DashboardSuperAdmin() {
   const [user, setUser] = useState(null);
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Laporan & filter-nya (dipakai di tab Dashboard dan Data Pelaporan)
   const [allReports, setAllReports] = useState([]);
@@ -69,6 +83,15 @@ export default function DashboardSuperAdmin() {
   const [filterKategori, setFilterKategori] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [draftFilterKategori, setDraftFilterKategori] = useState('');
+  const [draftFilterStatus, setDraftFilterStatus] = useState('');
+  const [draftFilterRegion, setDraftFilterRegion] = useState('');
+  const [draftFilterStartDate, setDraftFilterStartDate] = useState('');
+  const [draftFilterEndDate, setDraftFilterEndDate] = useState('');
+  const [reportPage, setReportPage] = useState(1);
+  const REPORT_PAGE_SIZE = 10;
   const [exporting, setExporting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
 
@@ -92,6 +115,39 @@ export default function DashboardSuperAdmin() {
   const [savingMaster, setSavingMaster] = useState(false);
 
   const getToken = () => localStorage.getItem('sipeka_token');
+
+  const openFilters = () => {
+    setDraftFilterKategori(filterKategori);
+    setDraftFilterStatus(filterStatus);
+    setDraftFilterRegion(filterRegion);
+    setDraftFilterStartDate(filterStartDate);
+    setDraftFilterEndDate(filterEndDate);
+    setFilterPanelOpen(value => !value);
+    setExportMenuOpen(false);
+  };
+
+  const applyFilters = () => {
+    setFilterKategori(draftFilterKategori);
+    setFilterStatus(draftFilterStatus);
+    setFilterRegion(draftFilterRegion);
+    setFilterStartDate(draftFilterStartDate);
+    setFilterEndDate(draftFilterEndDate);
+    setFilterPanelOpen(false);
+  };
+
+  const resetFilters = () => {
+    setDraftFilterKategori('');
+    setDraftFilterStatus('');
+    setDraftFilterRegion('');
+    setDraftFilterStartDate('');
+    setDraftFilterEndDate('');
+    setFilterKategori('');
+    setFilterStatus('');
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setFilterRegion('');
+    setFilterPanelOpen(false);
+  };
 
   // ==================== DATA FETCHING ====================
   // Tiap tab menu punya data sendiri, jadi cuma di-fetch pas tab itu aktif.
@@ -131,11 +187,16 @@ export default function DashboardSuperAdmin() {
 
   const fetchAll = useCallback(async (tok) => {
     const t = tok || getToken();
+    setLoading(true);
     // Tab Dashboard butuh allReports juga untuk chart & kartu ringkasan.
-    if (activeMenu === 'dashboard') { fetchStats(t); fetchReportsData(t); }
-    if (activeMenu === 'users') fetchUsers(t);
-    if (activeMenu === 'master') fetchMaster(t);
-    if (activeMenu === 'export') fetchReportsData(t);
+    try {
+      if (activeMenu === 'dashboard') await Promise.all([fetchStats(t), fetchReportsData(t)]);
+      if (activeMenu === 'users') await fetchUsers(t);
+      if (activeMenu === 'master') await fetchMaster(t);
+      if (activeMenu === 'export') await fetchReportsData(t);
+    } finally {
+      setLoading(false);
+    }
   }, [activeMenu]);
 
   useEffect(() => {
@@ -274,6 +335,15 @@ export default function DashboardSuperAdmin() {
     });
   };
 
+  const filteredReports = getFilteredReports();
+  const reportPageCount = Math.max(1, Math.ceil(filteredReports.length / REPORT_PAGE_SIZE));
+  const visibleReports = filteredReports.slice((reportPage - 1) * REPORT_PAGE_SIZE, reportPage * REPORT_PAGE_SIZE);
+
+  useEffect(() => { setReportPage(1); }, [searchQuery, filterStartDate, filterEndDate, filterRegion, filterKategori, filterStatus]);
+  useEffect(() => {
+    if (reportPage > reportPageCount) setReportPage(reportPageCount);
+  }, [reportPage, reportPageCount]);
+
   // Ekspor .xlsx asli (bukan CSV yang diberi nama .xlsx), supaya kolom tanggal
   // dan usia tetap bertipe tanggal/angka di Excel — bisa langsung disortir dan
   // difilter. Yang diekspor adalah data hasil filter yang sedang tampil.
@@ -372,30 +442,43 @@ export default function DashboardSuperAdmin() {
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 14;
-      const logoSize = 18;
+      const logoSize = 20;
 
       // Kop surat — dipanggil di setiap halaman (lihat didDrawPage di bawah
       // untuk halaman tabel), bukan cuma sekali di halaman pertama.
       const gambarKopSurat = () => {
         if (logoDataUrl) {
-          doc.addImage(logoDataUrl, 'PNG', margin, 10, logoSize, logoSize);
+          // Logo ditempatkan di tengah blok teks kop agar sejajar saat dicetak.
+          doc.addImage(logoDataUrl, 'PNG', margin, 10.5, logoSize, logoSize);
         }
-        const teksX = logoDataUrl ? margin + logoSize + 5 : margin;
+        const teksX = logoDataUrl ? margin + logoSize + 6 : margin;
+        const headerCenterX = teksX + ((pageWidth - margin) - teksX) / 2;
 
-        doc.setFontSize(12);
+        doc.setFontSize(10.5);
         doc.setFont(undefined, 'bold');
         doc.setTextColor(30, 30, 30);
-        doc.text('DINAS PEMBERDAYAAN PEREMPUAN DAN PERLINDUNGAN ANAK', teksX, 16);
-        doc.text('KOTA KENDARI', teksX, 21.5);
+        doc.text('PEMERINTAH KOTA KENDARI', headerCenterX, 14.5, { align: 'center' });
 
-        doc.setFontSize(9);
+        doc.setFontSize(13.5);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(25, 25, 25);
+        doc.text('DINAS PEMBERDAYAAN PEREMPUAN DAN PERLINDUNGAN ANAK KOTA KENDARI', headerCenterX, 21, { align: 'center' });
+
+        doc.setFontSize(8.5);
         doc.setFont(undefined, 'normal');
         doc.setTextColor(100, 100, 100);
-        doc.text('Sistem Pelaporan Kekerasan Perempuan dan Anak (SIPEKA)', teksX, 26.5);
+        const alamat = doc.splitTextToSize(
+          'Jalan Brigjen Z.A. Sugianto, Anduonohu, Kecamatan Kambu, Kota Kendari, Sulawesi Tenggara',
+          pageWidth - teksX - margin,
+        );
+        doc.text(alamat, headerCenterX, 27, { align: 'center' });
 
-        doc.setDrawColor(...WARNA_PEREMPUAN);
-        doc.setLineWidth(0.6);
-        doc.line(margin, 32, pageWidth - margin, 32);
+        // Garis ganda netral ala kop surat resmi pemerintah.
+        doc.setDrawColor(51, 51, 51);
+        doc.setLineWidth(0.8);
+        doc.line(margin, 33, pageWidth - margin, 33);
+        doc.setLineWidth(0.25);
+        doc.line(margin, 35, pageWidth - margin, 35);
       };
 
       // ===== HALAMAN 1: Kop surat + grafik =====
@@ -403,8 +486,8 @@ export default function DashboardSuperAdmin() {
 
       doc.setFontSize(13);
       doc.setFont(undefined, 'bold');
-      doc.setTextColor(...WARNA_PEREMPUAN);
-      doc.text('Laporan Data Pelaporan', margin, 40);
+      doc.setTextColor(30, 30, 30);
+      doc.text('Laporan Data Pelaporan SIPEKA', margin, 43);
 
       doc.setFontSize(9);
       doc.setFont(undefined, 'normal');
@@ -412,7 +495,7 @@ export default function DashboardSuperAdmin() {
       doc.text(
         `Dicetak ${new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}  •  ${data.length} data (mengikuti filter yang sedang aktif)`,
         margin,
-        45.5,
+        48.5,
       );
 
       // ===== Grafik batang: 3 kelurahan dengan laporan terbanyak =====
@@ -483,14 +566,14 @@ export default function DashboardSuperAdmin() {
       doc.addPage();
 
       autoTable(doc, {
-        startY: 46,
-        margin: { top: 46, left: margin, right: margin },
+        startY: 49,
+        margin: { top: 49, left: margin, right: margin },
         didDrawPage: () => {
           gambarKopSurat();
           doc.setFontSize(12);
           doc.setFont(undefined, 'bold');
-          doc.setTextColor(...WARNA_PEREMPUAN);
-          doc.text('Tabel Data Pelaporan', margin, 40);
+          doc.setTextColor(30, 30, 30);
+          doc.text('Tabel Data Pelaporan SIPEKA', margin, 43);
         },
         head: [EXPORT_COLUMNS.map((c) => c.header)],
         body: data.map((r) => {
@@ -535,6 +618,14 @@ export default function DashboardSuperAdmin() {
 
   return (
     <div className="dashboard-body" style={{ display: 'flex', minHeight: '100vh' }}>
+
+      {(exporting || exportingPdf) && (
+        <div className="system-loading-overlay" role="status" aria-live="polite">
+          <div className="system-loading-spinner" aria-hidden="true"></div>
+          <div className="system-loading-title">Menyiapkan file laporan</div>
+          <div className="system-loading-text">Mohon tunggu, data sedang diproses...</div>
+        </div>
+      )}
 
       {/* OVERLAY MOBILE */}
       <div
@@ -587,6 +678,13 @@ export default function DashboardSuperAdmin() {
             <h5 className="fw-bold m-0 text-dark">{MENU_ITEMS.find(m => m.id === activeMenu)?.label}</h5>
           </div>
         </div>
+
+        {loading && (
+          <div className="alert alert-light border shadow-sm d-flex align-items-center gap-2 mb-4" role="status" aria-live="polite">
+            <span className="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span>
+            <span>Sedang memuat data dashboard...</span>
+          </div>
+        )}
 
         {/* 1. TAB DASHBOARD (ringkasan eksekutif) */}
         {activeMenu === 'dashboard' && stats.summary && (
@@ -757,66 +855,29 @@ export default function DashboardSuperAdmin() {
                   />
                 </div>
 
-                <select className="toolbar-select" value={filterKategori} onChange={e => setFilterKategori(e.target.value)}>
-                  <option value="">Semua Kategori</option>
-                  <option value="anak">Anak</option>
-                  <option value="perempuan">Perempuan</option>
-                </select>
-
-                <select className="toolbar-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                  <option value="">Semua Status</option>
-                  <option value="menunggu_registrasi">Menunggu Registrasi</option>
-                  <option value="proses_assessment">Proses Assessment</option>
-                  <option value="dalam_penanganan">Dalam Penanganan</option>
-                  <option value="selesai">Selesai</option>
-                </select>
-
-                <button
-                  className="btn btn-success btn-sm rounded-pill px-3 fw-bold"
-                  onClick={handleExportExcel}
-                  disabled={exporting}
-                >
-                  <i className="bi bi-file-earmark-excel me-1"></i>
-                  {exporting ? 'Menyiapkan...' : 'Export Excel'}
+                <button type="button" className={`toolbar-icon-button ${filterPanelOpen ? 'is-open' : ''} ${filterKategori || filterStatus || filterRegion || filterStartDate || filterEndDate ? 'is-active' : ''}`} onClick={openFilters} aria-expanded={filterPanelOpen} aria-label="Buka filter" title="Filter">
+                  <i className="bi bi-funnel" aria-hidden="true"></i>
+                  {(filterKategori || filterStatus || filterRegion || filterStartDate || filterEndDate) && <span className="filter-active-dot" aria-label="Filter aktif"></span>}
                 </button>
-
-                <button
-                  className="btn btn-danger btn-sm rounded-pill px-3 fw-bold"
-                  onClick={handleExportPdf}
-                  disabled={exportingPdf}
-                >
-                  <i className="bi bi-file-earmark-pdf me-1"></i>
-                  {exportingPdf ? 'Menyiapkan...' : 'Export PDF'}
-                </button>
+                <div className="toolbar-popover-wrap">
+                  <button type="button" className="toolbar-icon-button" onClick={() => { setExportMenuOpen(value => !value); setFilterPanelOpen(false); }} aria-expanded={exportMenuOpen} aria-label="Buka pilihan export" title="Export"><i className="bi bi-download" aria-hidden="true"></i></button>
+                  {exportMenuOpen && <div className="toolbar-popover export-popover" role="menu">
+                    <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); handleExportExcel(); }} disabled={exporting}><i className="bi bi-file-earmark-excel" aria-hidden="true"></i>{exporting ? 'Menyiapkan...' : 'Export Excel'}</button>
+                    <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); handleExportPdf(); }} disabled={exportingPdf}><i className="bi bi-file-earmark-pdf" aria-hidden="true"></i>{exportingPdf ? 'Menyiapkan...' : 'Export PDF'}</button>
+                  </div>}
+                </div>
               </div>
             </div>
 
-            {/* Filter lanjutan: rentang tanggal & wilayah */}
-            <div className="d-flex align-items-center gap-2 px-4 py-2 bg-light border-bottom flex-wrap">
-              <small className="text-muted fw-bold me-1">Filter Lanjutan:</small>
-              <input type="date" className="form-control form-control-sm rounded-pill" style={{ width: 'auto' }} value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} />
-              <small className="text-muted">s/d</small>
-              <input type="date" className="form-control form-control-sm rounded-pill" style={{ width: 'auto' }} value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} />
-              <select className="toolbar-select" value={filterRegion} onChange={e => setFilterRegion(e.target.value)}>
-                <option value="">Semua Wilayah</option>
-                {[...new Set(allReports.map(r => r.kelurahan_korban).filter(Boolean))].sort().map(reg => (
-                  <option key={reg} value={reg}>{reg}</option>
-                ))}
-              </select>
-
-              {(searchQuery || filterKategori || filterStatus || filterStartDate || filterEndDate || filterRegion) && (
-                <button
-                  className="btn btn-sm btn-light text-muted rounded-pill px-3"
-                  onClick={() => { setSearchQuery(''); setFilterKategori(''); setFilterStatus(''); setFilterStartDate(''); setFilterEndDate(''); setFilterRegion(''); }}
-                >
-                  <i className="bi bi-x-circle me-1"></i>Reset
-                </button>
-              )}
-
-              <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1 ms-auto">
-                {getFilteredReports().length} data
-              </span>
-            </div>
+            {filterPanelOpen && <div className="filter-drawer" role="region" aria-label="Filter data pelaporan">
+              <div className="filter-drawer-grid">
+                <label>Kategori<select className="toolbar-select" value={draftFilterKategori} onChange={e => setDraftFilterKategori(e.target.value)}><option value="">Semua Kategori</option><option value="anak">Anak</option><option value="perempuan">Perempuan</option></select></label>
+                <label>Status<select className="toolbar-select" value={draftFilterStatus} onChange={e => setDraftFilterStatus(e.target.value)}><option value="">Semua Status</option><option value="menunggu_registrasi">Menunggu Registrasi</option><option value="proses_assessment">Proses Assessment</option><option value="dalam_penanganan">Dalam Penanganan</option><option value="selesai">Selesai</option></select></label>
+                <label>Wilayah<select className="toolbar-select" value={draftFilterRegion} onChange={e => setDraftFilterRegion(e.target.value)}><option value="">Semua Wilayah</option>{[...new Set(allReports.map(r => r.kelurahan_korban).filter(Boolean))].sort().map(reg => <option key={reg} value={reg}>{reg}</option>)}</select></label>
+                <label>Rentang tanggal<div className="filter-date-pair"><input type="date" className="filter-date-range" value={draftFilterStartDate} onChange={e => setDraftFilterStartDate(e.target.value)} aria-label="Tanggal mulai" /><span>s/d</span><input type="date" className="filter-date-range" value={draftFilterEndDate} onChange={e => setDraftFilterEndDate(e.target.value)} aria-label="Tanggal akhir" /></div></label>
+              </div>
+              <div className="filter-drawer-actions"><span className="text-muted small">{filteredReports.length} data sesuai filter</span><div className="d-flex gap-2"><button type="button" className="btn btn-light btn-sm" onClick={resetFilters}>Reset</button><button type="button" className="btn btn-primary btn-sm" onClick={applyFilters}>Terapkan</button></div></div>
+            </div>}
 
             {/* Table */}
             <div className="table-responsive">
@@ -833,7 +894,7 @@ export default function DashboardSuperAdmin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {getFilteredReports().map(r => (
+                  {visibleReports.map(r => (
                     <tr key={r.id}>
                       <td className="fw-bold text-primary">{r.kode_laporan}</td>
                       <td>
@@ -877,6 +938,7 @@ export default function DashboardSuperAdmin() {
                   )}
                 </tbody>
               </table>
+              <ReportPagination page={reportPage} pageCount={reportPageCount} onPageChange={setReportPage} total={filteredReports.length} />
             </div>
           </div>
         )}

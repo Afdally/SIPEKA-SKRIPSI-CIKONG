@@ -26,7 +26,11 @@ export function gatewayAssetUrl(path) {
 // Dipakai di semua request yang butuh login (hampir semua kecuali submit
 // laporan publik, cek status, dan lihat master data kategori kekerasan).
 export function authHeader(token) {
-  return { headers: { Authorization: `Bearer ${token}` } }
+  return { 
+    headers: { 
+      Authorization: `Bearer ${token}` 
+    } 
+  }
 }
 
 export default apiClient

@@ -18,13 +18,7 @@ const PREFERENSI_OPTIONS = [
   },
 ];
 
-// Layar pertama tab "Buat Laporan Baru". Tiga hal dikumpulkan di sini:
-// (1) cerita bebas — jadi bahan auto-isi form berikutnya lewat nlp-service,
-// (2) preferensi cara layanan — supaya pelapor tahu sejak awal bahwa laporan
-//     ini akan ditindaklanjuti dengan pertemuan nyata,
-// (3) pernyataan kebenaran laporan — dasar pertanggungjawaban, sekaligus
-//     penyaring ringan laporan iseng tanpa mempersulit korban asli.
-// Kalau AI-nya gagal/tidak tersedia, pelapor tetap bisa lanjut isi form manual.
+
 export default function CeritaKejadianStep({ masterKekerasan, teleponAwal, onSelesai }) {
   const [kronologi, setKronologi] = useState('');
   const [telepon, setTelepon] = useState(teleponAwal || '');

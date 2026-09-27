@@ -9,23 +9,19 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Konsumsi event perubahan status kasus yang dipublish case-service (lihat
-// case-service/src/queue/publisher.js) dan sinkronkan ke Laporan.status di sini.
-// Ini menggantikan panggilan HTTP sinkron case-service -> report-service:
-// kalau report-service sedang mati, pesan tetap tertampung durable di RabbitMQ
-// sampai service ini hidup lagi dan memproses ulang antrian.
+
 async function startConsumer() {
   let connection;
   try {
     connection = await amqp.connect(RABBITMQ_URL);
   } catch (err) {
-    console.error('❌ Gagal konek RabbitMQ, retry dalam 5 detik:', err.message);
+    console.error('Gagal konek RabbitMQ, retry dalam 5 detik:', err.message);
     await sleep(RETRY_DELAY_MS);
     return startConsumer();
   }
 
   connection.on('close', () => {
-    console.error('⚠️ Koneksi RabbitMQ terputus, mencoba reconnect...');
+    console.error('Koneksi RabbitMQ terputus, mencoba reconnect...');
     setTimeout(startConsumer, RETRY_DELAY_MS);
   });
   connection.on('error', () => {});
@@ -34,7 +30,7 @@ async function startConsumer() {
   await channel.assertQueue(QUEUE_NAME, { durable: true });
   channel.prefetch(1);
 
-  console.log(`👂 Menunggu pesan di queue "${QUEUE_NAME}"...`);
+  console.log(`Menunggu pesan di queue "${QUEUE_NAME}"...`);
 
   channel.consume(QUEUE_NAME, async (msg) => {
     if (!msg) return;
